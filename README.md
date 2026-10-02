@@ -1,92 +1,291 @@
-# autoresearch
+# Autoresearch Sentinel
 
-![teaser](progress.png)
+Autoresearch Sentinel is a system for persistent, evaluation-driven
+experimentation. It is intended for any project where candidate changes can be
+judged by a repeatable command and measurable result: tests, benchmarks,
+simulations, matches, or other domain-specific evaluators.
 
-*One day, frontier AI research used to be done by meat computers in between eating, sleeping, having other fun, and synchronizing once in a while using sound wave interconnect in the ritual of "group meeting". That era is long gone. Research is now entirely the domain of autonomous swarms of AI agents running across compute cluster megastructures in the skies. The agents claim that we are now in the 10,205th generation of the code base, in any case no one could tell if that's right or wrong as the "code" is now a self-modifying binary that has grown beyond human comprehension. This repo is the story of how it all began. -@karpathy, March 2026*.
+## Relationship to Karpathy's autoresearch
 
-The idea: give an AI agent a small but real LLM training setup and let it experiment autonomously overnight. It modifies the code, trains for 5 minutes, checks if the result improved, keeps or discards, and repeats. You wake up in the morning to a log of experiments and (hopefully) a better model. The training code here is a simplified single-GPU implementation of [nanochat](https://github.com/karpathy/nanochat). The core idea is that you're not touching any of the Python files like you normally would as a researcher. Instead, you are programming the `program.md` Markdown files that provide context to the AI agents and set up your autonomous research org. The default `program.md` in this repo is intentionally kept as a bare bones baseline, though it's obvious how one would iterate on it over time to find the "research org code" that achieves the fastest research progress, how you'd add more agents to the mix, etc. A bit more context on this project is here in this [tweet](https://x.com/karpathy/status/2029701092347630069) and [this tweet](https://x.com/karpathy/status/2031135152349524125).
+Sentinel is an improvement-oriented fork of [Andrej Karpathy's
+autoresearch](https://github.com/karpathy/autoresearch), which originally demonstrates
+autonomous experimentation on a compact single-GPU LLM training setup. That is
+a focused and useful machine-learning research paradigm: the agent edits
+training code, runs a bounded training job, and compares a validation metric.
+Sentinel carries the evaluate-and-keep-or-reject idea into projects beyond
+machine learning, where the evaluator might instead be a test suite, benchmark,
+simulation, or match.
 
-## How it works
+The other limitation Sentinel addresses is who owns the loop. In the original
+workflow, the agent is instructed to keep experimenting indefinitely. That
+instruction lives in the agent's prompt and context. An overnight run therefore
+depends on the agent continuing to remember and follow it across a long session.
+As context grows or is compressed, the loop instruction can be lost among
+other details; the agent can also stop after a completed task or produce an
+unexpected response. These are ordinary failure modes of relying on a
+probabilistic model to control a persistent process, and make unattended runs
+less reliable than the experiment design suggests.
 
-The repo is deliberately kept small and only really has three files that matter:
+Sentinel puts continuation under code control: the agent
+handles one bounded hypothesis, while code outside the model runs evaluation,
+records the result, persists progress, and schedules the next attempt. After a
+process interruption, Sentinel reuses the workspace only when `RESULT.json`
+contains a recorded hypothesis, then evaluates the preserved candidate. Without that checkpoint, it deletes the incomplete workspace and retries the
+same version from the latest approved seed; it does not resume the exact same
+Codex turn. Agent output and experiment results remain probabilistic;
+the goal is reliable orchestration, not deterministic discovery.
+As the developer, my aim is to remove uncertainty from the parts software can
+control by making continuation, state transitions, evaluation, and
+recordkeeping deterministic. That more deterministic orchestration is the
+improvement Autoresearch Sentinel sets out to provide.
 
-- **`prepare.py`** — fixed constants, one-time data prep (downloads training data, trains a BPE tokenizer), and runtime utilities (dataloader, evaluation). Not modified.
-- **`train.py`** — the single file the agent edits. Contains the full GPT model, optimizer (Muon + AdamW), and training loop. Everything is fair game: architecture, hyperparameters, optimizer, batch size, etc. **This file is edited and iterated on by the agent**.
-- **`program.md`** — baseline instructions for one agent. Point your agent here and let it go. **This file is edited and iterated on by the human**.
+## Current status
 
-By design, training runs for a **fixed 5-minute time budget** (wall clock, excluding startup/compilation), regardless of the details of your compute. The metric is **val_bpb** (validation bits per byte) — lower is better, and vocab-size-independent so architectural changes are fairly compared.
+The Sentinel (the Python Controller) is implemented in `run_sentinel.py`. It
+creates isolated workspaces, invokes the Codex Python SDK, runs configured
+build/evaluation commands, applies Sentinel-owned approval, and loops until
+interrupted (or `--once` is used). Configure Sentinel for a target project
+before running; the checked-in `config.toml` is deliberately a placeholder.
 
-If you are new to neural networks, this ["Dummy's Guide"](https://x.com/hooeem/status/2030720614752039185) looks pretty good for a lot more context.
+## Benefits of Autoresearch Sentinel
 
-## Quick start
+- **Works beyond machine learning:** use it wherever a repeatable command can
+  measure a candidate, including tests, benchmarks, simulations, and matches.
+- **Reliable long-running orchestration:** Sentinel owns continuation, so the
+  agent does not have to remember to keep its own loop running across a long
+  context or overnight session.
+- **Bounded agent work:** each turn proposes one hypothesis, implements it, and
+  returns control; evaluation and the next attempt happen outside the model.
+- **Reduce carried-forward context:** Sentinel starts a fresh Codex thread for
+  each experiment and supplies the current sandbox, program, and logbook instead
+  of the preceding experiments' full agent conversation. Prior conversation
+  inputs count toward input tokens and context limits in multi-turn model
+  workflows, so leaving old experiment transcripts out can reduce per-experiment
+  context and input-token use ([OpenAI conversation-state guide](https://developers.openai.com/api/docs/guides/conversation-state),
+  [token definitions](https://help.openai.com/en/articles/4936856-understanding-and-counting-tokens)).
+  This reduces carried history; it does not guarantee lower total token usage,
+  since each attempt still needs the current project context.
+- **Cumulative improvements:** every attempt starts from the latest approved
+  full-project snapshot, so accepted changes build on each other.
+- **Reviewable experiments:** approved snapshots, structured results, metrics,
+  command logs, and the logbook give the setup a durable record.
+- **Project-specific toolchains:** configure build and evaluator commands
+  without requiring the target project to use the same language as Sentinel.
 
-**Requirements:** A single NVIDIA GPU (tested on H100), Python 3.10+, [uv](https://docs.astral.sh/uv/).
+## Guardrails enforced by Sentinel
+
+- **Explicit edit allowlist:** `candidate.editable_files` lists the only
+  project paths the agent may edit or create. Other project files remain
+  readable as context.
+- **Post-turn change check:** after the agent returns, Sentinel compares the
+  candidate project against its latest approved source. If any non-allowlisted
+  file was added, removed, or changed, Sentinel rejects the attempt. It also
+  checks that sandbox instruction and logbook files were not changed.
+- **Hypothesis checkpoint for recovery:** the agent must write its hypothesis
+  to `RESULT.json` before editing project files. If Sentinel restarts and finds
+  that checkpoint, it evaluates the preserved candidate; without it, Sentinel
+  deletes the workspace and retries the same version from the latest approved
+  snapshot.
+- **Isolated evaluation:** build and evaluation commands run on a separate copy
+  of the candidate, leaving the candidate snapshot clean for promotion.
+- **Structured, Sentinel-owned approval:** Sentinel validates the evaluator's
+  JSON result and applies the configured metric, direction, threshold, and
+  failure rules. The agent cannot approve its own change.
+- **Bounded execution:** agent, build, and evaluation commands have configured
+  timeouts. `--once` runs a single attempt; otherwise Sentinel continues until
+  interrupted.
+
+These guardrails make orchestration and state changes predictable. They do not
+make a probabilistic agent or a noisy evaluator deterministic, and a candidate
+still needs a useful, repeatable evaluation contract.
+
+## Repository layout
+
+```text
+README.md                    project overview and status
+config.toml                  language-neutral project/run configuration
+run_sentinel.py              Sentinel
+requirements.txt             Codex Python SDK and Python 3.10 TOML support
+.autoresearch/project/       initial full-project seed setup
+GUIDELINE.md                 evaluator integration and approval contract
+PROGRAM.md                   bounded task instructions for the agent
+LOGBOOK.md                   tracked research guidance and attempt summaries
+approved/                    tracked accepted candidate snapshots and evidence
+.autoresearch/experimentation/ ignored active workspaces and hypotheses
+.autoresearch/rejected/       ignored rejected candidates and raw outputs
+```
+
+The experiment and rejected folders are local runtime data and are gitignored.
+The approved folder and logbook are version-controlled so accepted results and
+their durable context can be reviewed and shared.
+
+## One fork per experiment setup
+
+Fork Autoresearch Sentinel once for each experiment setup. A setup has its own
+target project, evaluator commands and metric, agent configuration, version
+sequence, approved candidates, rejected attempts, and active experimentation
+workspaces. Keeping those together in one fork prevents separate experiments
+from overwriting or mixing configuration and candidate state. To run another
+independent setup, create another fork rather than sharing the same
+`config.toml`, `approved/`, or `.autoresearch/` directories.
+
+## Usage
+
+In the fork for this setup, configure `config.toml` for one target project and
+evaluator. Install Sentinel dependencies with your preferred Python
+environment tool:
 
 ```bash
-
-# 1. Install uv project manager (if you don't already have it)
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# 2. Install dependencies
-uv sync
-
-# 3. Download data and train tokenizer (one-time, ~2 min)
-uv run prepare.py
-
-# 4. Manually run a single training experiment (~5 min)
-uv run train.py
+python -m pip install -r requirements.txt
 ```
 
-If the above commands all work ok, your setup is working and you can go into autonomous research mode.
+Create the initial project folder:
 
-## Running the agent
-
-Simply spin up your Claude/Codex or whatever you want in this repo (and disable all permissions), then you can prompt something like:
-
-```
-Hi have a look at program.md and let's kick off a new experiment! let's do the setup first.
+```bash
+python run_sentinel.py --setup-project
 ```
 
-The `program.md` file is essentially a super lightweight "skill".
+By default, this creates `.autoresearch/project/V1-0/`. Copy the complete
+target project into that folder, including its build files, tests, and
+evaluator, but omit its nested `.git` directory. Remove the placeholder
+`.gitkeep`, then configure `editable_files`, build/evaluation commands, and the
+metric in `config.toml` as described below. The source folder is the initial
+seed; each approved attempt thereafter becomes the new full-project seed.
 
-## Project structure
+Preview the isolated workspace without invoking the agent, build, or evaluator:
 
+```bash
+python run_sentinel.py --config config.toml --dry-run
 ```
-prepare.py      — constants, data prep + runtime utilities (do not modify)
-train.py        — model, optimizer, training loop (agent modifies this)
-program.md      — agent instructions
-pyproject.toml  — dependencies
+
+The preview remains in `.autoresearch/experimentation/` for inspection. Since it
+has no hypothesis checkpoint, the next normal run deletes and recreates that
+workspace for the same candidate version.
+
+Inspect `.autoresearch/experimentation/<candidate>/`, then start one complete
+baseline/candidate cycle:
+
+```bash
+python run_sentinel.py --config config.toml --once
 ```
 
-## Design choices
+On the first normal run, Sentinel evaluates the initial `V1-0` seed and saves
+an immutable full-project baseline snapshot under `approved/V1-0/project/`.
+The first experiment is `V1-1`. Each later attempt copies the latest approved
+full project snapshot; when approved, its entire project tree is stored under
+`approved/<version>/project/` and becomes the seed for the next version. A
+rejected attempt does not change the latest approved seed. `approved/state.json`
+tracks the latest approved version, its metric, and the next candidate version.
 
-- **Single file to modify.** The agent only touches `train.py`. This keeps the scope manageable and diffs reviewable.
-- **Fixed time budget.** Training always runs for exactly 5 minutes, regardless of your specific platform. This means you can expect approx 12 experiments/hour and approx 100 experiments while you sleep. There are two upsides of this design decision. First, this makes experiments directly comparable regardless of what the agent changes (model size, batch size, architecture, etc). Second, this means that autoresearch will find the most optimal model for your platform in that time budget. The downside is that your runs (and results) become not comparable to other people running on other compute platforms.
-- **Self-contained.** No external dependencies beyond PyTorch and a few small packages. No distributed training, no complex configs. One GPU, one file, one metric.
+Remove `--once` to run continuously. Sentinel starts each bounded
+agent attempt, evaluates it, records the approval decision, and starts the next
+attempt without asking the agent whether to continue. Stop the process with
+Ctrl+C. The Codex SDK uses the configured model and the host's existing Codex
+login/runtime.
 
-## Platform support
+### Command-line parameters
 
-This code currently requires that you have a single NVIDIA GPU. In principle it is quite possible to support CPU, MPS and other platforms but this would also bloat the code. I'm not 100% sure that I want to take this on personally right now. People can reference (or have their agents reference) the full/parent nanochat repository that has wider platform support and shows the various solutions (e.g. a Flash Attention 3 kernels fallback implementation, generic device support, autodetection, etc.), feel free to create forks or discussions for other platforms and I'm happy to link to them here in the README in some new notable forks section or etc.
+| Parameter | Meaning |
+| --- | --- |
+| `--config PATH` | TOML configuration file. Defaults to the repository's `config.toml`. |
+| `--setup-project` | Create the initial `V<major>-<minor>` project seed folder from `[project].seed_dir` and the configured starting version. Run once before adding the target project. |
+| `--prompt TEXT` | Optional research direction included in the generated sandbox `PROGRAM.md`. The agent still makes one bounded change. |
+| `--once` | Run baseline setup if needed, perform one attempt, then exit. |
+| `--dry-run` | Prepare the isolated attempt workspace and exit without invoking Codex, building, or evaluating. |
+| `-h`, `--help` | Show command help and exit. |
 
-Seeing as there seems to be a lot of interest in tinkering with autoresearch on much smaller compute platforms than an H100, a few extra words. If you're going to try running autoresearch on smaller computers (Macbooks etc.), I'd recommend one of the forks below. On top of this, here are some recommendations for how to tune the defaults for much smaller models for aspiring forks:
+### `config.toml` parameters
 
-1. To get half-decent results I'd use a dataset with a lot less entropy, e.g. this [TinyStories dataset](https://huggingface.co/datasets/karpathy/tinystories-gpt4-clean). These are GPT-4 generated short stories. Because the data is a lot narrower in scope, you will see reasonable results with a lot smaller models (if you try to sample from them after training).
-2. You might experiment with decreasing `vocab_size`, e.g. from 8192 down to 4096, 2048, 1024, or even - simply byte-level tokenizer with 256 possibly bytes after utf-8 encoding.
-3. In `prepare.py`, you'll want to lower `MAX_SEQ_LEN` a lot, depending on the computer even down to 256 etc. As you lower `MAX_SEQ_LEN`, you may want to experiment with increasing `DEVICE_BATCH_SIZE` in `train.py` slightly to compensate. The number of tokens per fwd/bwd pass is the product of these two.
-4. Also in `prepare.py`, you'll want to decrease `EVAL_TOKENS` so that your validation loss is evaluated on a lot less data.
-5. In `train.py`, the primary single knob that controls model complexity is the `DEPTH` (default 8, here). A lot of variables are just functions of this, so e.g. lower it down to e.g. 4.
-6. You'll want to most likely use `WINDOW_PATTERN` of just "L", because "SSSL" uses alternating banded attention pattern that may be very inefficient for you. Try it.
-7. You'll want to lower `TOTAL_BATCH_SIZE` a lot, but keep it powers of 2, e.g. down to `2**14` (~16K) or so even, hard to tell.
+| Setting | Required / default | Purpose |
+| --- | --- | --- |
+| `[project].seed_dir` | Default: `.autoresearch/project` | Parent folder for the initial full-project seed, named using the configured starting major/minor version. |
+| `[agent].provider` | Required; currently `"codex"` only | Selects the agent SDK adapter. |
+| `[agent].model` | Required | Model ID passed to the Codex SDK, such as the configured `gpt-6-luna` example. |
+| `[agent].timeout_seconds` | Default: `1800` | Maximum duration of one agent implementation turn. |
+| `[candidate].major_version`, `[candidate].minor_version` | Required; defaults: `1`, `0` | Version of the initial seed folder (`V1-0` by default). The first experiment advances to the next minor version. |
+| `[candidate].editable_files` | Required | Array of project-relative file paths the agent may edit or create. Other project files remain available as read-only context. |
+| `[candidate].file_prefix` | Required | Safe suffix containing letters, digits, `.`, `_`, or `-`. Attempt workspaces look like `V1-1_solver`; approved snapshots use the version only. |
+| `[workspace].experimentation_dir` | Default: `.autoresearch/experimentation` | Parent directory for active attempt workspaces. |
+| `[workspace].approved_dir` | Default: `approved` | Stores complete baseline/approved project snapshots, evaluator evidence, and `state.json`. |
+| `[workspace].rejected_dir` | Default: `.autoresearch/rejected` | Stores rejected or interrupted attempts locally. |
+| `[workspace].logbook` | Default: `LOGBOOK.md` | Append-only durable record of hypotheses, outcomes, metrics, and decisions. |
+| `[commands].build` | Default: `[]` (skip build) | Argument array for the target project's build command. |
+| `[commands].evaluate` | Required | Argument array for the evaluator. It must write the configured JSON result file. |
+| `[commands].timeout_seconds` | Default: `3600` | Timeout applied separately to build and evaluation commands. |
+| `[evaluation].result_file` | Required | Result JSON path, relative to the copied project root. |
+| `[metric].name` | Required | Human-readable metric name used in the logbook. |
+| `[metric].json_path` | Required | Dot-separated JSON path to the numeric metric, for example `metrics.score`. |
+| `[metric].direction` | Required: `minimize` or `maximize` | Defines which direction is an improvement. |
+| `[approval].minimum_improvement` | Default: `0.0` | Required improvement versus the latest approved result; the candidate must exceed this threshold. |
 
-I think these would be the reasonable hyperparameters to play with. Ask your favorite coding agent for help and copy paste them this guide, as well as the full source code.
+Commands are argument arrays, not shell command strings. For example:
 
-## Notable forks
+```toml
+[commands]
+build = ["dotnet", "build", "MyProject.sln"]
+evaluate = ["python", "evaluate.py", "--result", "evaluation-result.json"]
+timeout_seconds = 3600
+```
 
-- [miolini/autoresearch-macos](https://github.com/miolini/autoresearch-macos) (MacOS)
-- [trevin-creator/autoresearch-mlx](https://github.com/trevin-creator/autoresearch-mlx) (MacOS)
-- [jsegov/autoresearch-win-rtx](https://github.com/jsegov/autoresearch-win-rtx) (Windows)
-- [andyluo7/autoresearch](https://github.com/andyluo7/autoresearch) (AMD)
+Sentinel executes both commands from a separate evaluation copy of the
+candidate project. Each argument may use `{project_root}` or `{candidate_file}`
+substitutions. `{candidate_file}` resolves to the first path in
+`candidate.editable_files`. An empty build array skips building; the evaluator
+command cannot be empty. The candidate snapshot itself remains clean and is what gets
+promoted when approved.
 
-## License
+The evaluator must write a JSON object like this to
+`[evaluation].result_file`:
 
-MIT
+```json
+{
+  "schema_version": 1,
+  "status": "completed",
+  "metrics": {"score": 0.82},
+  "failures": [],
+  "artifacts": ["logs/run.csv"]
+}
+```
+
+Set `[metric].json_path = "metrics.score"` for this example. `failures` must
+be an array and must be empty for approval. `artifacts` is optional; when
+present, each path must identify a file inside the copied project. The complete
+contract and approval extension point are described in
+[`GUIDELINE.md`](GUIDELINE.md).
+
+When no compatible baseline exists, Sentinel builds and evaluates the initial
+seed to establish one. Each candidate is then evaluated against the latest
+approved version. Missing or malformed evaluator output, a non-zero command,
+reported failures, or insufficient metric improvement rejects that attempt.
+Without `--once`, rejected attempts are recorded and the loop continues until
+you interrupt it.
+
+## Evaluation and approval
+
+Each configured evaluation command must write the JSON response described in
+[`GUIDELINE.md`](GUIDELINE.md). Sentinel checks its schema, status, failures,
+configured numeric metric, and any declared artifact paths. When no baseline
+exists, the first run builds and measures the initial `V<major>-<minor>` seed
+to establish a baseline snapshot under `approved/`. Each approved attempt saves
+the complete updated project tree; the next candidate is cloned from that
+snapshot, so improvements accumulate. Candidates are compared to the latest approved metric using
+`direction` and `minimum_improvement`; only Sentinel makes the approval decision.
+The sandbox agent returns after implementation and receives no evaluation
+result or approval decision. Projects with extra acceptance gates should extend
+`approval_decision()` and document their result fields in the guideline.
+
+## Agent workflow contract
+
+Before each attempt, the agent reads its generated `PROGRAM.md`, stable
+read-only `LOGBOOK.md`, and every file in the isolated project snapshot under
+`.autoresearch/experimentation/`. Before editing, it records its hypothesis in
+`RESULT.json`; then it edits only paths listed in `candidate.editable_files`
+and records its implementation summary in `RESULT.json`. This checkpoint lets
+Sentinel evaluate a preserved attempt after interruption; with no checkpoint, it
+deletes the workspace and retries that version from the latest approved snapshot.
+Sentinel runs evaluation and moves the attempt to `approved/` or `.autoresearch/rejected/` according to the configured
+rule. It appends a concise outcome to `LOGBOOK.md`.
+
+Agents must not run the persistent loop themselves or decide whether an
+experiment passed. The Sentinel enforces the configured parts of this
+contract.

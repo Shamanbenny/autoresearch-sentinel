@@ -1,0 +1,44 @@
+# Language-neutral experiment configuration. The whole project is copied from
+# the latest approved version into each attempt and evaluation workspace.
+
+[project]
+# Parent folder containing the initial V<major>-<minor> project seed.
+seed_dir = ".autoresearch/project"
+
+[agent]
+provider = "codex"
+model = "gpt-6-luna"
+timeout_seconds = 1800
+
+[candidate]
+# These identify the initial seed folder (V1-0); the first experiment is V1-1.
+major_version = 1
+minor_version = 0
+# Project-relative paths the agent may modify or create. All other project files are read-only.
+editable_files = ["path/to/source-file"]
+file_prefix = "candidate"
+
+[workspace]
+experimentation_dir = ".autoresearch/experimentation"
+approved_dir = "approved"
+rejected_dir = ".autoresearch/rejected"
+logbook = "LOGBOOK.md"
+
+[commands]
+# Each command is an argument array; no shell or package manager is assumed.
+# Available substitutions: {project_root}, {candidate_file}.
+build = []
+evaluate = []
+timeout_seconds = 3600
+
+[evaluation]
+# Evaluator must write this JSON file, relative to the copied project root.
+result_file = "evaluation-result.json"
+
+[metric]
+name = "replace-me"
+json_path = "metrics.replace-me"
+direction = "minimize" # or "maximize"
+
+[approval]
+minimum_improvement = 0.0

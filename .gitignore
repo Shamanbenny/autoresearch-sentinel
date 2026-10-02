@@ -1,23 +1,17 @@
-# Python-generated files
+# Ignore every runtime file under these folders except their root README.md.
+# Approved snapshots remain reviewable in version control.
+/.autoresearch/experimentation/**
+!/.autoresearch/experimentation/README.md
+/.autoresearch/rejected/**
+!/.autoresearch/rejected/README.md
+
+# Common local runtime/build artifacts for Python and .NET targets.
 __pycache__/
-*.py[oc]
+*.py[co]
+.venv/
+venv/
+bin/
+obj/
 build/
 dist/
-wheels/
-*.egg-info
-
-# Virtual environments
-.venv
-worktrees/
-results/
-queue/
-
-# Agent prompt files (generated per-session by launchers)
-CLAUDE.md
-AGENTS.md
-
-# Experimental code/artifacts
-dev/
-
-# Results file
-results.tsv
+*.egg-info/
