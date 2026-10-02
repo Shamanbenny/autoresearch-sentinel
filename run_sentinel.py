@@ -614,10 +614,11 @@ def execute_candidate(
         return name, False, None, "dry run only"
 
     agent_error = ""
+    agent_response = ""
     if not recovering:
         print(f"Prepared {workspace.relative_to(config_path.parent)}")
         try:
-            run_codex_turn(
+            agent_response = run_codex_turn(
                 workspace,
                 config,
                 "Follow PROGRAM.md exactly. Enumerate and read every file in the sandbox. Choose one bounded, "
@@ -643,7 +644,15 @@ def execute_candidate(
         else:
             shutil.rmtree(workspace, ignore_errors=True)
             reason = agent_error or "Agent stopped before recording a hypothesis; retrying this version from the latest approved snapshot."
-            print(f"{name}: no hypothesis checkpoint; discarded workspace and left version state unchanged.")
+            print(f"{name}: {reason}", file=sys.stderr)
+            if agent_response.strip():
+                excerpt = agent_response.strip()
+                if len(excerpt) > 1500:
+                    excerpt = excerpt[:1500] + "… [truncated]"
+                print(f"Agent final response before cleanup:\n{excerpt}", file=sys.stderr)
+            elif not agent_error:
+                print("The Codex turn completed without writing a hypothesis to RESULT.json.", file=sys.stderr)
+            print("Discarded the incomplete workspace and left version state unchanged.", file=sys.stderr)
             return name, False, None, reason
     elif not isinstance(recovered_result.get("implementation_summary"), str) or not recovered_result["implementation_summary"].strip():
         recovered_result["implementation_summary"] = "Implementation was interrupted; Sentinel evaluated the preserved project files."
