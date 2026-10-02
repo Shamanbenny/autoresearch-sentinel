@@ -132,12 +132,21 @@ independent setup, create another fork rather than sharing the same
 ## Usage
 
 In the fork for this setup, configure `config.toml` for one target project and
-evaluator. Install Sentinel dependencies with your preferred Python
-environment tool:
+evaluator. Install Sentinel dependencies in a project-local virtual
+environment. On Debian or Ubuntu, install `python3-full` first if `venv` is not
+available (`sudo apt install python3-full`).
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
 python -m pip install -r requirements.txt
 ```
+
+On Windows PowerShell, use `py -m venv .venv`, then
+`.venv\Scripts\Activate.ps1`, followed by `python -m pip install -r requirements.txt`.
+Run Sentinel from the activated environment. This avoids installing packages
+into an OS-managed Python, which may reject system-wide `pip` installs under
+PEP 668.
 
 Create the initial project folder:
 
