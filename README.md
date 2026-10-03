@@ -240,7 +240,7 @@ gives a short look at the demo in action.
 
 [![Maze pathfinder experiment plot](https://github.com/Shamanbenny/autoresearch-sentinel/blob/demo/maze-pathfinder/sentinel-research-plot.svg)](https://github.com/Shamanbenny/autoresearch-sentinel/blob/demo/maze-pathfinder/sentinel-research-plot.svg)
 
-[Watch the maze pathfinder demo video](https://github.com/Shamanbenny/autoresearch-sentinel/blob/demo/maze-pathfinder/Demo_Video.mp4).
+https://github.com/user-attachments/assets/db4bda64-75fd-4716-bf8e-9a3c7b7d5be0
 
 ### Command-line parameters
 
