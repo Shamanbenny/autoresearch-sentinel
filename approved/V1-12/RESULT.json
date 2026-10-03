@@ -1,0 +1,4 @@
+{
+  "hypothesis": "Replacing layer-based bidirectional BFS with deterministic A* using Manhattan distance as an admissible heuristic will reduce total nodes explored on the fixed maze suite while preserving shortest-path correctness.",
+  "implementation_summary": "Replaced bidirectional BFS with heap-based A* using Manhattan distance, fixed neighbor order, deterministic priority tie-breaking, stale-entry skipping, and parent reconstruction when the goal is removed from the queue."
+}

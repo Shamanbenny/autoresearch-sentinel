@@ -1,0 +1,4 @@
+{
+  "hypothesis": "Ordering each BFS node's valid neighbors by increasing Manhattan distance to the goal will reduce total nodes explored on the fixed maze suite while preserving shortest-path correctness, because the search remains FIFO BFS.",
+  "implementation_summary": "Changed solver.py to collect valid unvisited neighbors and sort them by Manhattan distance to the goal before appending them to the FIFO BFS queue; Python's stable sort preserves the original direction order for equal distances."
+}

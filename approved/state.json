@@ -2,13 +2,13 @@
   "configured_major": 1,
   "evaluator_signature": "538dd1db34aa8928e0edac39ae8b3cb940476e1e41d2357b44c4f074edc79d4e",
   "latest_approved": {
-    "direction": "minimize",
-    "metric": 1930.0,
+    "version": "V1-16",
+    "project_dir": "approved/V1-16/project",
+    "metric": 577.0,
     "metric_name": "total_nodes_explored",
-    "project_dir": "approved/V1-0/project",
-    "version": "V1-0"
+    "direction": "minimize"
   },
   "next_major": 1,
-  "next_minor": 1,
+  "next_minor": 28,
   "seed_dir": ".autoresearch/project/V1-0"
 }

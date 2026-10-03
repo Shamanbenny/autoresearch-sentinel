@@ -1,0 +1,4 @@
+{
+  "hypothesis": "Returning as soon as BFS first discovers the goal will reduce total dequeued nodes on the fixed maze suite while preserving shortest-path correctness, because FIFO BFS discovers nodes in nondecreasing distance order.",
+  "implementation_summary": "Added an early exit after the current BFS node enqueues its valid neighbors when the goal has been discovered, avoiding later dequeues while retaining the discovered parent chain."
+}

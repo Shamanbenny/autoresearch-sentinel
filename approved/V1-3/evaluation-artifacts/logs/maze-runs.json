@@ -1,0 +1,104 @@
+[
+  {
+    "case": "open-grid",
+    "shortest_path_length": 12,
+    "candidate_path_length": 12,
+    "nodes_explored": 47
+  },
+  {
+    "case": "vertical-detour",
+    "shortest_path_length": 16,
+    "candidate_path_length": 16,
+    "nodes_explored": 43
+  },
+  {
+    "case": "horizontal-detour",
+    "shortest_path_length": 16,
+    "candidate_path_length": 16,
+    "nodes_explored": 47
+  },
+  {
+    "case": "offset-obstacles",
+    "shortest_path_length": 20,
+    "candidate_path_length": 20,
+    "nodes_explored": 97
+  },
+  {
+    "case": "scattered-walls",
+    "shortest_path_length": 24,
+    "candidate_path_length": 24,
+    "nodes_explored": 149
+  },
+  {
+    "case": "open-rectangle",
+    "shortest_path_length": 18,
+    "candidate_path_length": 18,
+    "nodes_explored": 89
+  },
+  {
+    "case": "vertical-barrier-gap-high",
+    "shortest_path_length": 18,
+    "candidate_path_length": 18,
+    "nodes_explored": 69
+  },
+  {
+    "case": "double-horizontal-barriers",
+    "shortest_path_length": 42,
+    "candidate_path_length": 42,
+    "nodes_explored": 119
+  },
+  {
+    "case": "central-block",
+    "shortest_path_length": 24,
+    "candidate_path_length": 24,
+    "nodes_explored": 142
+  },
+  {
+    "case": "zigzag-barriers",
+    "shortest_path_length": 22,
+    "candidate_path_length": 22,
+    "nodes_explored": 68
+  },
+  {
+    "case": "narrow-east-passage",
+    "shortest_path_length": 18,
+    "candidate_path_length": 18,
+    "nodes_explored": 112
+  },
+  {
+    "case": "offset-islands",
+    "shortest_path_length": 26,
+    "candidate_path_length": 26,
+    "nodes_explored": 173
+  },
+  {
+    "case": "west-side-switchbacks",
+    "shortest_path_length": 24,
+    "candidate_path_length": 24,
+    "nodes_explored": 129
+  },
+  {
+    "case": "near-goal-detour",
+    "shortest_path_length": 24,
+    "candidate_path_length": 24,
+    "nodes_explored": 150
+  },
+  {
+    "case": "multiple-short-gaps",
+    "shortest_path_length": 28,
+    "candidate_path_length": 28,
+    "nodes_explored": 137
+  },
+  {
+    "case": "dense-upper-obstacles",
+    "shortest_path_length": 24,
+    "candidate_path_length": 24,
+    "nodes_explored": 127
+  },
+  {
+    "case": "long-south-corridor",
+    "shortest_path_length": 42,
+    "candidate_path_length": 42,
+    "nodes_explored": 161
+  }
+]

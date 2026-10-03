@@ -1,0 +1,4 @@
+{
+  "hypothesis": "Returning as soon as Manhattan A* first discovers the goal will reduce nodes explored on the fixed maze suite while preserving shortest-path correctness, because with a consistent unit-cost Manhattan heuristic an optimal-route frontier node must be expanded before any suboptimal goal predecessor.",
+  "implementation_summary": "In solver.py, reconstruct and return the parent path immediately when a newly discovered A* neighbor is the goal, before adding that goal to the heap."
+}

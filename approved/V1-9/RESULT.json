@@ -1,0 +1,4 @@
+{
+  "hypothesis": "Layer-based bidirectional BFS that expands the smaller frontier each round will reduce total nodes explored on the fixed maze suite while preserving shortest-path correctness, because it searches evenly outward from both endpoints and joins parent chains at a shared cell.",
+  "implementation_summary": "Replaced one-sided BFS with deterministic layer-based bidirectional BFS that expands the smaller frontier, records parent and distance maps from both endpoints, and joins the shortest meeting candidate from the completed layer to reconstruct the path."
+}

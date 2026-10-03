@@ -57,6 +57,384 @@
         "approved": null,
         "reason": "Measured the latest approved V1-0 seed across the fixed 17-maze evaluator suite."
       }
+    },
+    {
+      "candidate": "V1-1_maze_pathfinder",
+      "status": "approved",
+      "hypothesis": "Ordering each BFS node's valid neighbors by increasing Manhattan distance to the goal will reduce total nodes explored on the fixed maze suite while preserving shortest-path correctness, because the search remains FIFO BFS.",
+      "implementation_summary": "Changed solver.py to collect valid unvisited neighbors and sort them by Manhattan distance to the goal before appending them to the FIFO BFS queue; Python's stable sort preserves the original direction order for equal distances.",
+      "metrics": {
+        "total_nodes_explored": 1917.0
+      },
+      "decision": {
+        "outcome": "approved",
+        "approved": true,
+        "reason": "Improvement 13 exceeded required minimum 0 (baseline 1930)."
+      }
+    },
+    {
+      "candidate": "V1-2_maze_pathfinder",
+      "status": "rejected",
+      "hypothesis": "Adding remaining row distance as a secondary neighbor-order key after Manhattan distance will reduce total nodes explored on the fixed maze suite while preserving shortest-path correctness, because the solver remains FIFO BFS.",
+      "implementation_summary": "Updated the deterministic neighbor sort key to use Manhattan distance first and remaining row distance second, favoring vertical progress when Manhattan distances tie; FIFO BFS and its shortest-path behavior are unchanged.",
+      "metrics": {
+        "total_nodes_explored": 1917.0
+      },
+      "decision": {
+        "outcome": "rejected",
+        "approved": false,
+        "reason": "Improvement 0 did not exceed required minimum 0 (baseline 1917)."
+      }
+    },
+    {
+      "candidate": "V1-3_maze_pathfinder",
+      "status": "approved",
+      "hypothesis": "Returning as soon as BFS first discovers the goal will reduce total dequeued nodes on the fixed maze suite while preserving shortest-path correctness, because FIFO BFS discovers nodes in nondecreasing distance order.",
+      "implementation_summary": "Added an early exit after the current BFS node enqueues its valid neighbors when the goal has been discovered, avoiding later dequeues while retaining the discovered parent chain.",
+      "metrics": {
+        "total_nodes_explored": 1859.0
+      },
+      "decision": {
+        "outcome": "approved",
+        "approved": true,
+        "reason": "Improvement 58 exceeded required minimum 0 (baseline 1917)."
+      }
+    },
+    {
+      "candidate": "V1-4_maze_pathfinder",
+      "status": "rejected",
+      "hypothesis": "Adding remaining column distance as a secondary neighbor-order key after Manhattan distance will reduce total nodes explored on the fixed maze suite while preserving shortest-path correctness, because FIFO BFS remains unchanged.",
+      "implementation_summary": "Added remaining column distance as a secondary key when sorting valid BFS neighbors after Manhattan distance; FIFO queue behavior and early goal-discovery exit remain unchanged.",
+      "metrics": {
+        "total_nodes_explored": 1859.0
+      },
+      "decision": {
+        "outcome": "rejected",
+        "approved": false,
+        "reason": "Improvement 0 did not exceed required minimum 0 (baseline 1859)."
+      }
+    },
+    {
+      "candidate": "V1-5_maze_pathfinder",
+      "status": "rejected",
+      "hypothesis": "When valid BFS neighbors tie on Manhattan distance to the goal, preferring movement along the axis with the larger remaining start-to-goal displacement will reduce total nodes explored on the fixed maze suite while preserving shortest-path correctness, because FIFO BFS remains unchanged.",
+      "implementation_summary": "Kept FIFO BFS and Manhattan-distance ordering, adding a deterministic tie-break that prefers the axis with the larger remaining displacement from the current cell to the goal.",
+      "metrics": {
+        "total_nodes_explored": 1859.0
+      },
+      "decision": {
+        "outcome": "rejected",
+        "approved": false,
+        "reason": "Improvement 0 did not exceed required minimum 0 (baseline 1859)."
+      }
+    },
+    {
+      "candidate": "V1-6_maze_pathfinder",
+      "status": "rejected",
+      "hypothesis": "Among valid BFS neighbors tied on Manhattan distance to the goal, prioritizing the neighbor with fewer open adjacent cells will reduce total nodes explored on the fixed maze suite while preserving shortest-path correctness, because the search remains FIFO BFS.",
+      "implementation_summary": "Extended the deterministic neighbor sort key with the count of in-bounds non-wall adjacent cells, after Manhattan distance; equal scores retain the existing direction order and FIFO BFS behavior.",
+      "metrics": {
+        "total_nodes_explored": 1859.0
+      },
+      "decision": {
+        "outcome": "rejected",
+        "approved": false,
+        "reason": "Improvement 0 did not exceed required minimum 0 (baseline 1859)."
+      }
+    },
+    {
+      "candidate": "V1-7_maze_pathfinder",
+      "status": "rejected",
+      "hypothesis": "Among valid BFS neighbors tied on Manhattan distance to the goal, preferring the neighbor with smaller squared Euclidean distance to the goal will reduce total nodes explored on the fixed maze suite while preserving shortest-path correctness, because the search remains FIFO BFS.",
+      "implementation_summary": "Kept Manhattan distance as the primary BFS neighbor-order key and added squared Euclidean distance to the goal as the secondary key for ties; FIFO queue behavior and early goal-discovery exit remain unchanged.",
+      "metrics": {
+        "total_nodes_explored": 1859.0
+      },
+      "decision": {
+        "outcome": "rejected",
+        "approved": false,
+        "reason": "Improvement 0 did not exceed required minimum 0 (baseline 1859)."
+      }
+    },
+    {
+      "candidate": "V1-8_maze_pathfinder",
+      "status": "rejected",
+      "hypothesis": "Among valid BFS neighbors tied on Manhattan distance to the goal, preferring the neighbor with more open adjacent cells will reduce total nodes explored on the fixed maze suite while preserving shortest-path correctness, because FIFO BFS remains unchanged.",
+      "implementation_summary": "Kept FIFO BFS and Manhattan distance as the primary neighbor-order key, adding descending count of in-bounds non-wall adjacent cells as the secondary key.",
+      "metrics": {
+        "total_nodes_explored": 1859.0
+      },
+      "decision": {
+        "outcome": "rejected",
+        "approved": false,
+        "reason": "Improvement 0 did not exceed required minimum 0 (baseline 1859)."
+      }
+    },
+    {
+      "candidate": "V1-9_maze_pathfinder",
+      "status": "approved",
+      "hypothesis": "Layer-based bidirectional BFS that expands the smaller frontier each round will reduce total nodes explored on the fixed maze suite while preserving shortest-path correctness, because it searches evenly outward from both endpoints and joins parent chains at a shared cell.",
+      "implementation_summary": "Replaced one-sided BFS with deterministic layer-based bidirectional BFS that expands the smaller frontier, records parent and distance maps from both endpoints, and joins the shortest meeting candidate from the completed layer to reconstruct the path.",
+      "metrics": {
+        "total_nodes_explored": 1664.0
+      },
+      "decision": {
+        "outcome": "approved",
+        "approved": true,
+        "reason": "Improvement 195 exceeded required minimum 0 (baseline 1859)."
+      }
+    },
+    {
+      "candidate": "V1-10_maze_pathfinder",
+      "status": "rejected",
+      "hypothesis": "Expanding the goal-side frontier when the two bidirectional BFS frontiers have equal size will reduce total nodes explored on the fixed maze suite while preserving shortest-path correctness, because the same complete-layer search is retained with only its equal-size side tie-break changed.",
+      "implementation_summary": "Changed the frontier-size comparison in solver.py from <= to <, so equal-sized frontiers now expand from the goal side; all layer expansion and path reconstruction logic is unchanged.",
+      "metrics": {
+        "total_nodes_explored": 1675.0
+      },
+      "decision": {
+        "outcome": "rejected",
+        "approved": false,
+        "reason": "Improvement -11 did not exceed required minimum 0 (baseline 1664)."
+      }
+    },
+    {
+      "candidate": "V1-11_maze_pathfinder",
+      "status": "rejected",
+      "hypothesis": "Pruning newly discovered bidirectional BFS cells whose own-side distance plus Manhattan distance to the opposite endpoint exceeds an already found valid route length will reduce explored nodes on the fixed maze suite while preserving shortest-path correctness, because that lower bound proves such cells cannot belong to a shorter route.",
+      "implementation_summary": "In solver.py, before adding each neighbor to the next frontier, compute its own-side distance plus Manhattan distance to the opposite endpoint; skip it only when this lower bound exceeds a valid route length already found in the current layer.",
+      "metrics": {
+        "total_nodes_explored": 1664.0
+      },
+      "decision": {
+        "outcome": "rejected",
+        "approved": false,
+        "reason": "Improvement 0 did not exceed required minimum 0 (baseline 1664)."
+      }
+    },
+    {
+      "candidate": "V1-12_maze_pathfinder",
+      "status": "approved",
+      "hypothesis": "Replacing layer-based bidirectional BFS with deterministic A* using Manhattan distance as an admissible heuristic will reduce total nodes explored on the fixed maze suite while preserving shortest-path correctness.",
+      "implementation_summary": "Replaced bidirectional BFS with heap-based A* using Manhattan distance, fixed neighbor order, deterministic priority tie-breaking, stale-entry skipping, and parent reconstruction when the goal is removed from the queue.",
+      "metrics": {
+        "total_nodes_explored": 594.0
+      },
+      "decision": {
+        "outcome": "approved",
+        "approved": true,
+        "reason": "Improvement 1070 exceeded required minimum 0 (baseline 1664)."
+      }
+    },
+    {
+      "candidate": "V1-13_maze_pathfinder",
+      "status": "rejected",
+      "hypothesis": "Breaking equal-priority A* ties by neighbor insertion order after the existing f-score and heuristic keys will reduce total nodes explored on the fixed maze suite while preserving shortest-path correctness.",
+      "implementation_summary": "Added a monotonic insertion counter as the final A* heap tie-break key, preserving the existing f-score and heuristic ordering while resolving otherwise equal entries by deterministic neighbor insertion order.",
+      "metrics": {
+        "total_nodes_explored": 594.0
+      },
+      "decision": {
+        "outcome": "rejected",
+        "approved": false,
+        "reason": "Improvement 0 did not exceed required minimum 0 (baseline 594)."
+      }
+    },
+    {
+      "candidate": "V1-14_maze_pathfinder",
+      "status": "rejected",
+      "hypothesis": "Adding the number of direction changes in the current parent path as a deterministic tie-break after A*'s existing f-score and Manhattan-distance keys will reduce nodes explored on the fixed maze suite while preserving shortest-path correctness, because it only reorders nodes with equal f and heuristic values.",
+      "implementation_summary": "In solver.py, tracked each discovered cell's path turn count and incoming direction, then added turn count as the third A* heap key after f-score and Manhattan distance; movement order and path reconstruction remain unchanged.",
+      "metrics": {
+        "total_nodes_explored": 599.0
+      },
+      "decision": {
+        "outcome": "rejected",
+        "approved": false,
+        "reason": "Improvement -5 did not exceed required minimum 0 (baseline 594)."
+      }
+    },
+    {
+      "candidate": "V1-15_maze_pathfinder",
+      "status": "rejected",
+      "hypothesis": "Reversing the row-coordinate tie-break for A* entries with equal f-score and Manhattan heuristic will reduce total nodes explored on the fixed maze suite while preserving shortest-path correctness, because it changes only the order of equally ranked entries.",
+      "implementation_summary": "Changed the A* heap's coordinate tie-break from ascending (row, column) to descending row then ascending column, retaining f-score and Manhattan heuristic as the primary keys.",
+      "metrics": {
+        "total_nodes_explored": 654.0
+      },
+      "decision": {
+        "outcome": "rejected",
+        "approved": false,
+        "reason": "Improvement -60 did not exceed required minimum 0 (baseline 594)."
+      }
+    },
+    {
+      "candidate": "V1-16_maze_pathfinder",
+      "status": "approved",
+      "hypothesis": "Returning as soon as Manhattan A* first discovers the goal will reduce nodes explored on the fixed maze suite while preserving shortest-path correctness, because with a consistent unit-cost Manhattan heuristic an optimal-route frontier node must be expanded before any suboptimal goal predecessor.",
+      "implementation_summary": "In solver.py, reconstruct and return the parent path immediately when a newly discovered A* neighbor is the goal, before adding that goal to the heap.",
+      "metrics": {
+        "total_nodes_explored": 577.0
+      },
+      "decision": {
+        "outcome": "approved",
+        "approved": true,
+        "reason": "Improvement 17 exceeded required minimum 0 (baseline 594)."
+      }
+    },
+    {
+      "candidate": "V1-17_maze_pathfinder",
+      "status": "rejected",
+      "hypothesis": "Ordering A* frontier ties by column then row, after the existing f-score and Manhattan heuristic keys, will reduce total nodes explored on the fixed maze suite while preserving shortest-path correctness, because it changes only deterministic ordering among equal-score entries.",
+      "implementation_summary": "In solver.py, changed the A* frontier coordinate tie-break to compare column before row while keeping f-score, Manhattan heuristic, search behavior, and path reconstruction unchanged.",
+      "metrics": {
+        "total_nodes_explored": 643.0
+      },
+      "decision": {
+        "outcome": "rejected",
+        "approved": false,
+        "reason": "Improvement -66 did not exceed required minimum 0 (baseline 577)."
+      }
+    },
+    {
+      "candidate": "V1-18_maze_pathfinder",
+      "status": "rejected",
+      "hypothesis": "Ordering equal-f-score, equal-Manhattan A* frontier entries by descending column then ascending row will reduce total nodes explored on the fixed maze suite while preserving shortest-path correctness, because it changes only deterministic ordering among equally ranked entries.",
+      "implementation_summary": "Changed the A* heap key in solver.py to compare descending column and then ascending row after f-score and Manhattan distance; search behavior and path reconstruction are unchanged.",
+      "metrics": {
+        "total_nodes_explored": 577.0
+      },
+      "decision": {
+        "outcome": "rejected",
+        "approved": false,
+        "reason": "Improvement 0 did not exceed required minimum 0 (baseline 577)."
+      }
+    },
+    {
+      "candidate": "V1-19_maze_pathfinder",
+      "status": "rejected",
+      "hypothesis": "Ordering equal-f-score, equal-Manhattan A* entries by descending row then descending column will reduce total nodes explored on the fixed maze suite while preserving shortest-path correctness, because it changes only deterministic ordering among equally ranked entries.",
+      "implementation_summary": "Changed the A* heap key in solver.py to compare descending row then descending column after f-score and Manhattan distance; path cost handling, search logic, and reconstruction are unchanged.",
+      "metrics": {
+        "total_nodes_explored": 637.0
+      },
+      "decision": {
+        "outcome": "rejected",
+        "approved": false,
+        "reason": "Improvement -60 did not exceed required minimum 0 (baseline 577)."
+      }
+    },
+    {
+      "candidate": "V1-20_maze_pathfinder",
+      "status": "rejected",
+      "hypothesis": "Breaking equal-f-score, equal-Manhattan A* ties by preferring cells with smaller row then larger column will reduce total nodes explored on the fixed maze suite while preserving shortest-path correctness, because it only changes deterministic ordering among equal-score entries.",
+      "implementation_summary": "Changed the A* heap key in solver.py to compare row ascending then column descending after f-score and Manhattan distance; search behavior and path reconstruction are unchanged.",
+      "metrics": {
+        "total_nodes_explored": 577.0
+      },
+      "decision": {
+        "outcome": "rejected",
+        "approved": false,
+        "reason": "Improvement 0 did not exceed required minimum 0 (baseline 577)."
+      }
+    },
+    {
+      "candidate": "V1-21_maze_pathfinder",
+      "status": "rejected",
+      "hypothesis": "On the fixed 17-maze suite, preferring larger Manhattan heuristic values among A* entries tied on f-score will reduce total nodes explored while preserving shortest-path correctness, because it only changes expansion order among equal-f-score entries and the Manhattan heuristic remains admissible and consistent.",
+      "implementation_summary": "Changed the A* heap tie-break to use negative Manhattan heuristic after f-score, so equal-f-score entries with larger heuristic values are popped first; adjusted heap unpacking and stale-entry checking to recover the original heuristic.",
+      "metrics": {
+        "total_nodes_explored": 1720.0
+      },
+      "decision": {
+        "outcome": "rejected",
+        "approved": false,
+        "reason": "Improvement -1143 did not exceed required minimum 0 (baseline 577)."
+      }
+    },
+    {
+      "candidate": "V1-22_maze_pathfinder",
+      "status": "rejected",
+      "hypothesis": "On the fixed 17-maze suite, ordering A* entries tied on both f-score and Manhattan heuristic by greater projection toward the goal will reduce total nodes explored while preserving shortest-path correctness, because it changes only deterministic ordering among equal-score entries.",
+      "implementation_summary": "Added goal-direction projection as the final A* heap tie-break after f-score and Manhattan distance; path costs, neighbor order, stale-entry handling, and reconstruction remain unchanged.",
+      "metrics": {
+        "total_nodes_explored": 577.0
+      },
+      "decision": {
+        "outcome": "rejected",
+        "approved": false,
+        "reason": "Improvement 0 did not exceed required minimum 0 (baseline 577)."
+      }
+    },
+    {
+      "candidate": "V1-23_maze_pathfinder",
+      "status": "rejected",
+      "hypothesis": "On the fixed 17-maze suite, preferring A* frontier cells with more traversable neighboring cells when f-score and Manhattan heuristic tie will reduce total nodes explored while preserving shortest-path correctness, because this only reorders equally ranked search states.",
+      "implementation_summary": "Added traversable-neighbor count as a descending A* frontier tie-break after f-score and Manhattan heuristic; existing path costs, search logic, and reconstruction remain unchanged.",
+      "metrics": {
+        "total_nodes_explored": 603.0
+      },
+      "decision": {
+        "outcome": "rejected",
+        "approved": false,
+        "reason": "Improvement -26 did not exceed required minimum 0 (baseline 577)."
+      }
+    },
+    {
+      "candidate": "V1-24_maze_pathfinder",
+      "status": "rejected",
+      "hypothesis": "On the fixed 17-maze suite, preferring smaller squared Euclidean distance to the goal among A* entries tied on both f-score and Manhattan distance will reduce total nodes explored while preserving shortest-path correctness, because it changes only deterministic ordering among states with equal optimality bounds.",
+      "implementation_summary": "Added squared Euclidean distance to the goal as an A* heap tie-break after f-score and Manhattan distance; search costs, neighbor order, goal-discovery return, and path reconstruction are unchanged.",
+      "metrics": {
+        "total_nodes_explored": 605.0
+      },
+      "decision": {
+        "outcome": "rejected",
+        "approved": false,
+        "reason": "Improvement -28 did not exceed required minimum 0 (baseline 577)."
+      }
+    },
+    {
+      "candidate": "V1-25_maze_pathfinder",
+      "status": "rejected",
+      "hypothesis": "On the fixed 17-maze suite, returning a direct path immediately when start and goal share a row or column with no intervening wall will reduce total A* nodes explored while preserving shortest-path correctness, because the unobstructed straight path has the Manhattan lower-bound length.",
+      "implementation_summary": "Added a pre-search fast path for same-row or same-column endpoints: it constructs the straight segment, returns it when every cell is traversable, and reports the segment's cell count as explored; all other cases continue through the existing A* solver.",
+      "metrics": {
+        "total_nodes_explored": 577.0
+      },
+      "decision": {
+        "outcome": "rejected",
+        "approved": false,
+        "reason": "Improvement 0 did not exceed required minimum 0 (baseline 577)."
+      }
+    },
+    {
+      "candidate": "V1-26_maze_pathfinder",
+      "status": "rejected",
+      "hypothesis": "On the fixed 17-maze suite, preferring A* cells closer to the start-goal line when f-score and Manhattan distance tie will reduce total nodes explored while preserving shortest paths, because the new key only reorders states with equal optimality bounds.",
+      "implementation_summary": "Added absolute start-goal line offset as a deterministic tertiary A* heap key after f-score and Manhattan distance; path costs, neighbor expansion, and path reconstruction are unchanged.",
+      "metrics": {
+        "total_nodes_explored": 617.0
+      },
+      "decision": {
+        "outcome": "rejected",
+        "approved": false,
+        "reason": "Improvement -40 did not exceed required minimum 0 (baseline 577)."
+      }
+    },
+    {
+      "candidate": "V1-27_maze_pathfinder",
+      "status": "rejected",
+      "hypothesis": "On the fixed 17-maze suite, bidirectional Manhattan A* that expands the smaller frontier and returns once a joined route is no longer than either search frontier\u2019s minimum f-score will reduce total nodes explored while preserving shortest paths.",
+      "implementation_summary": "Replaced one-sided A* in solver.py with two deterministic Manhattan A* frontiers, expanding the smaller heap, recording the shortest joined route, and returning its reconstructed path once a frontier f-score proves that route optimal.",
+      "metrics": {
+        "total_nodes_explored": 668.0
+      },
+      "decision": {
+        "outcome": "rejected",
+        "approved": false,
+        "reason": "Improvement -91 did not exceed required minimum 0 (baseline 577)."
+      }
     }
   ]
 }
