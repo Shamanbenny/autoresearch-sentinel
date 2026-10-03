@@ -203,7 +203,8 @@ def setup_project(config_path: Path) -> Path:
 def atomic_json(path: Path, value: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temp = path.with_suffix(path.suffix + ".tmp")
-    temp.write_text(json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    # Keep the logbook's deliberate reading order when rewriting its JSON.
+    temp.write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
     os.replace(temp, path)
 
 
