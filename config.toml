@@ -22,7 +22,7 @@ file_prefix = "candidate"
 experimentation_dir = ".autoresearch/experimentation"
 approved_dir = "approved"
 rejected_dir = ".autoresearch/rejected"
-logbook = "LOGBOOK.md"
+logbook = "LOGBOOK.json"
 
 [commands]
 # Each command is an argument array; no shell or package manager is assumed.

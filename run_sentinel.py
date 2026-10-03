@@ -367,18 +367,49 @@ def append_logbook(
     value: float | None,
     reason: str,
     return_note: dict[str, Any],
+    reported_metrics: dict[str, Any] | None = None,
+    metric_direction: str | None = None,
 ) -> None:
-    with path.open("a", encoding="utf-8") as handle:
-        shown = "n/a" if value is None else f"{value:.8g}"
-        hypothesis = str(return_note.get("hypothesis", "not recorded")).replace("\n", " ").strip()
-        summary = str(return_note.get("implementation_summary", "not recorded")).replace("\n", " ").strip()
-        handle.write(
-            f"\n### {candidate} — {status}\n\n"
-            f"- Hypothesis: {hypothesis}\n"
-            f"- Implementation: {summary}\n"
-            f"- Metric: `{metric_name} = {shown}`\n"
-            f"- Decision: {reason}\n"
-        )
+    try:
+        document = read_json(path) if path.exists() else read_json(SENTINEL_ROOT / "LOGBOOK.json")
+    except ExperimentError as exc:
+        raise ExperimentError(f"Cannot append experiment to JSON logbook {path}: {exc}") from exc
+    experiments = document.get("experiments")
+    if document.get("schema_version") != 1 or not isinstance(experiments, list):
+        raise ExperimentError(f"JSON logbook {path} must have schema_version 1 and an experiments array.")
+    project_context = document.setdefault("project_context", {})
+    if isinstance(project_context, dict) and metric_direction in {"minimize", "maximize"}:
+        directions = project_context.setdefault("metric_directions", {})
+        if isinstance(directions, dict):
+            directions[metric_name] = metric_direction
+
+    metrics: dict[str, float | None] = {}
+
+    def collect_metrics(value: Any, prefix: str = "") -> None:
+        if isinstance(value, dict):
+            for key, item in value.items():
+                collect_metrics(item, f"{prefix}.{key}" if prefix else str(key))
+        elif isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value):
+            metrics[prefix] = float(value)
+
+    collect_metrics(reported_metrics or {})
+    metrics[metric_name] = value
+    approved = True if status == "approved" else False if status == "rejected" else None
+    experiments.append(
+        {
+            "candidate": candidate,
+            "status": status,
+            "hypothesis": str(return_note.get("hypothesis", "not recorded")).replace("\n", " ").strip(),
+            "implementation_summary": str(return_note.get("implementation_summary", "not recorded")).replace("\n", " ").strip(),
+            "metrics": metrics,
+            "decision": {
+                "outcome": status,
+                "approved": approved,
+                "reason": reason,
+            },
+        }
+    )
+    atomic_json(path, document)
 
 
 def approval_decision(value: float, baseline: float, config: dict[str, Any], failures: list[Any]) -> tuple[bool, str]:
@@ -609,6 +640,8 @@ def establish_baseline(
             value,
             "Measured the latest approved seed as the reference for this evaluator configuration.",
             {"hypothesis": "Baseline measurement", "implementation_summary": "No candidate changes applied."},
+            result.get("metrics", {}),
+            config["metric"]["direction"],
         )
         return baseline
 
@@ -682,7 +715,7 @@ def execute_candidate(
         project_dir = workspace / "project"
         copy_project(source_project, project_dir)
         (workspace / "PROGRAM.md").write_text(render_program(name, [item.as_posix() for item in editable_files], prompt), encoding="utf-8")
-        logbook_copy = workspace / "LOGBOOK.md"
+        logbook_copy = workspace / "LOGBOOK.json"
         shutil.copy2(logbook_path, logbook_copy)
         logbook_copy.chmod(0o444)
         result_path_in_workspace.write_text(
@@ -844,8 +877,8 @@ def execute_candidate(
         version = version_label(major, minor)
         output = artifact_root / config["workspace"]["approved_dir"] / version
         if output.exists():
-            # The hypothesis checkpoint and workspace are authoritative until
-            # state commits. Rebuild this version's promotion artifacts after a
+            # The completed attempt workspace is authoritative until state
+            # commits. Rebuild this version's promotion artifacts after a
             # crash instead of failing on a partial orphan folder.
             shutil.rmtree(output)
         output.mkdir(parents=True)
@@ -883,7 +916,17 @@ def execute_candidate(
     state["configured_major"] = configured_major
     state["seed_dir"] = seed_dir.relative_to(config_path.parent).as_posix()
     atomic_json(state_path, state)
-    append_logbook(logbook_path, name, "approved" if approved else "rejected", config["metric"]["name"], value, reason, return_note)
+    append_logbook(
+        logbook_path,
+        name,
+        "approved" if approved else "rejected",
+        config["metric"]["name"],
+        value,
+        reason,
+        return_note,
+        result.get("metrics", {}) if result is not None else {},
+        config["metric"]["direction"],
+    )
     if approved:
         shutil.rmtree(workspace)
     log_section(f"Experiment {name} complete")

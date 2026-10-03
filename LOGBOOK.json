@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "guide": {
+    "purpose": "Durable, machine-readable experiment history for analysis and visualization.",
+    "usage": [
+      "Read project_context and project_guidance for context specific to this experiment setup.",
+      "Each object in experiments is one baseline measurement or candidate outcome.",
+      "Use candidate as the ordered category or x-axis and metrics.<metric_name> as a numeric series.",
+      "Compare records only when their metric names and measurement contracts are compatible.",
+      "The guide and field names are project-agnostic; project-specific metric names and context belong in values."
+    ],
+    "fields": {
+      "schema_version": "Version of this JSON document structure.",
+      "project_context": "Free-form description of the evaluated system and measurement scope, plus metric direction metadata.",
+      "project_guidance": "Project-specific constraints and reusable research advice for agents.",
+      "experiments": "Ordered array of baseline and candidate records.",
+      "experiments[].candidate": "Human-readable identifier for a baseline or candidate; naming is project-defined.",
+      "experiments[].status": "Record category or outcome, such as baseline, approved, or rejected.",
+      "experiments[].hypothesis": "Expected effect being tested.",
+      "experiments[].implementation_summary": "Concise description of the implemented change, or baseline setup.",
+      "experiments[].metrics": "Object mapping project-defined metric names to numeric values; unavailable values may be null.",
+      "experiments[].decision": "Decision outcome, nullable approval boolean, and human-readable reason."
+    },
+    "graphing": {
+      "recommended_x": "experiments[].candidate",
+      "recommended_y": "experiments[].metrics.<metric_name>",
+      "filter": "Select one metric key and omit records whose value for that key is null.",
+      "approval_series": "Use experiments[].decision.approved to distinguish accepted and rejected candidates; baseline records use null.",
+      "metric_direction": "Read project_context.metric_directions when present; minimize means lower values improve, maximize means higher values improve."
+    }
+  },
+  "project_context": {
+    "summary": "",
+    "measurement_scope": "",
+    "metric_directions": {}
+  },
+  "project_guidance": [],
+  "experiments": []
+}

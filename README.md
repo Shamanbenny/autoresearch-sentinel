@@ -29,10 +29,12 @@ less reliable than the experiment design suggests.
 Sentinel puts continuation under code control: the agent
 handles one bounded hypothesis, while code outside the model runs evaluation,
 records the result, persists progress, and schedules the next attempt. After a
-process interruption, Sentinel reuses the workspace only when `RESULT.json`
-contains a recorded hypothesis, then evaluates the preserved candidate. Without that checkpoint, it deletes the incomplete workspace and retries the
-same version from the latest approved seed; it does not resume the exact same
-Codex turn. Agent output and experiment results remain probabilistic;
+process interruption, Sentinel reuses a workspace only when `RESULT.json`
+contains a non-empty hypothesis and implementation summary and the candidate
+has an actual allowlisted source change. Otherwise it discards the incomplete
+project copy and restarts that version from the latest approved seed, asking
+for a different hypothesis; it does not resume the exact same Codex turn.
+Agent output and experiment results remain probabilistic;
 the goal is reliable orchestration, not deterministic discovery.
 As the developer, my aim is to remove uncertainty from the parts software can
 control by making continuation, state transitions, evaluation, and
@@ -81,11 +83,11 @@ before running; the checked-in `config.toml` is deliberately a placeholder.
   candidate project against its latest approved source. If any non-allowlisted
   file was added, removed, or changed, Sentinel rejects the attempt. It also
   checks that sandbox instruction and logbook files were not changed.
-- **Hypothesis checkpoint for recovery:** the agent must write its hypothesis
-  to `RESULT.json` before editing project files. If Sentinel restarts and finds
-  that checkpoint, it evaluates the preserved candidate; without it, Sentinel
-  deletes the workspace and retries the same version from the latest approved
-  snapshot.
+- **Implementation checkpoint for recovery:** the agent writes its hypothesis
+  before editing and its implementation summary after making a change. Sentinel
+  evaluates a preserved candidate only when both fields are present and an
+  allowlisted project file actually changed; otherwise it restarts the same
+  version from the latest approved snapshot and asks for a different hypothesis.
 - **Isolated evaluation:** build and evaluation commands run on a separate copy
   of the candidate, leaving the candidate snapshot clean for promotion.
 - **Structured, Sentinel-owned approval:** Sentinel validates the evaluator's
@@ -109,7 +111,8 @@ requirements.txt             Codex Python SDK and Python 3.10 TOML support
 .autoresearch/project/       initial full-project seed setup
 GUIDELINE.md                 evaluator integration and approval contract
 PROGRAM.md                   bounded task instructions for the agent
-LOGBOOK.md                   tracked research guidance and attempt summaries
+LOGBOOK.json                 tracked project guidance and structured experiment data
+plot_logbook.py              dependency-free SVG charts from experiment metrics
 approved/                    tracked accepted candidate snapshots and evidence
 .autoresearch/experimentation/ ignored active workspaces and hypotheses
 .autoresearch/rejected/       ignored rejected candidates and raw outputs
@@ -195,6 +198,19 @@ attempt without asking the agent whether to continue. Stop the process with
 Ctrl+C. The Codex SDK uses the configured model and the host's existing Codex
 login/runtime.
 
+Generate an SVG chart of the metric history, including rejected attempts:
+
+```bash
+python plot_logbook.py
+```
+
+After Sentinel has recorded at least one numeric metric, the script reads
+`LOGBOOK.json`, includes every record with a numeric value,
+colors approved, rejected, and baseline points separately, and always writes
+`sentinel-research-plot.svg` at the repository root. Use
+`--metric NAME` when the logbook contains multiple metrics or `--logbook PATH`
+to read another JSON logbook. It uses only the Python standard library.
+
 ### Command-line parameters
 
 | Parameter | Meaning |
@@ -220,12 +236,12 @@ login/runtime.
 | `[workspace].experimentation_dir` | Default: `.autoresearch/experimentation` | Parent directory for active attempt workspaces. |
 | `[workspace].approved_dir` | Default: `approved` | Stores complete baseline/approved project snapshots, evaluator evidence, and `state.json`. |
 | `[workspace].rejected_dir` | Default: `.autoresearch/rejected` | Stores rejected or interrupted attempts locally. |
-| `[workspace].logbook` | Default: `LOGBOOK.md` | Append-only durable record of hypotheses, outcomes, metrics, and decisions. |
+| `[workspace].logbook` | Default: `LOGBOOK.json` | JSON record containing an embedded usage guide, project guidance, and structured experiment outcomes and metrics. |
 | `[commands].build` | Default: `[]` (skip build) | Argument array for the target project's build command. |
 | `[commands].evaluate` | Required | Argument array for the evaluator. It must write the configured JSON result file. |
 | `[commands].timeout_seconds` | Default: `3600` | Timeout applied separately to build and evaluation commands. |
 | `[evaluation].result_file` | Required | Result JSON path, relative to the copied project root. |
-| `[metric].name` | Required | Human-readable metric name used in the logbook. |
+| `[metric].name` | Required | Human-readable metric name recorded in the JSON logbook and used by the graph script. |
 | `[metric].json_path` | Required | Dot-separated JSON path to the numeric metric, for example `metrics.score`. |
 | `[metric].direction` | Required: `minimize` or `maximize` | Defines which direction is an improvement. |
 | `[approval].minimum_improvement` | Default: `0.0` | Required improvement versus the latest approved result; the candidate must exceed this threshold. |
@@ -289,14 +305,16 @@ result or approval decision. Projects with extra acceptance gates should extend
 ## Agent workflow contract
 
 Before each attempt, the agent reads its generated `PROGRAM.md`, stable
-read-only `LOGBOOK.md`, and every file in the isolated project snapshot under
+read-only `LOGBOOK.json`, and every file in the isolated project snapshot under
 `.autoresearch/experimentation/`. Before editing, it records its hypothesis in
 `RESULT.json`; then it edits only paths listed in `candidate.editable_files`
-and records its implementation summary in `RESULT.json`. This checkpoint lets
-Sentinel evaluate a preserved attempt after interruption; with no checkpoint, it
-deletes the workspace and retries that version from the latest approved snapshot.
+and records its implementation summary in `RESULT.json`. Sentinel resumes an
+interrupted attempt only when the summary is present and at least one allowed
+project file actually changed. A hypothesis alone is not treated as a completed
+implementation; Sentinel restarts that version from the latest approved
+snapshot and asks for a different hypothesis.
 Sentinel runs evaluation and moves the attempt to `approved/` or `.autoresearch/rejected/` according to the configured
-rule. It appends a concise outcome to `LOGBOOK.md`.
+rule. It appends a structured outcome and evaluator metrics to `LOGBOOK.json`.
 
 Agents must not run the persistent loop themselves or decide whether an
 experiment passed. The Sentinel enforces the configured parts of this

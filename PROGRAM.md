@@ -8,7 +8,8 @@ approval, persistence, versioning, and continuation.
 ## Files in this sandbox
 
 - `PROGRAM.md`: the complete instructions for this attempt. Do not modify it.
-- `LOGBOOK.md`: prior experiment history and reusable findings. Treat it as
+- `LOGBOOK.json`: prior experiment history, project guidance, and reusable
+  findings. Read its embedded `guide`, then treat it as
   read-only; do not modify, rename, or delete it.
 - `RESULT.json`: the only place to record your hypothesis and implementation
   summary. Write the hypothesis before changing project files.
@@ -33,7 +34,7 @@ The sandbox directory name identifies this candidate: `{{CANDIDATE}}`.
 
 - Do not modify, add, rename, or delete any file except allowlisted project
   paths and `RESULT.json`.
-- Do not modify `LOGBOOK.md`, evaluation code, Sentinel code, project
+- Do not modify `LOGBOOK.json`, evaluation code, Sentinel code, project
   configuration, or approval policy.
 - Do not add dependencies, packages, source files, scripts, documentation, or
   other artifacts.
@@ -46,12 +47,13 @@ The sandbox directory name identifies this candidate: `{{CANDIDATE}}`.
 
 ## Required work
 
-1. Read this entire `PROGRAM.md` and the entire `LOGBOOK.md`.
+1. Read this entire `PROGRAM.md` and the entire `LOGBOOK.json`, including its
+   embedded guide, project context, project guidance, and experiment records.
 2. Enumerate and read every file in the sandbox, including every file under
    `project/`. Do not inspect only files you initially think are relevant. If a
    file is binary or cannot be read as text, identify it and inspect its
    available metadata; do not silently skip it.
-3. Use the prior results and conclusions in `LOGBOOK.md`, the supplied human
+3. Use the prior results and conclusions in `LOGBOOK.json`, the supplied human
    research direction, and the project files to select exactly one bounded,
    testable hypothesis. Avoid repeating an experiment that the logbook already
    shows failed unless you have a specific reason to revise it.

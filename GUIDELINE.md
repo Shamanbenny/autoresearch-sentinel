@@ -13,7 +13,7 @@ Sentinel creates:
 ```text
 .autoresearch/experimentation/VM-N_P/
   PROGRAM.md                 the single generated agent instruction file
-  LOGBOOK.md                 read-only copy of durable findings
+  LOGBOOK.json               read-only copy of durable findings and its guide
   RESULT.json                hypothesis checkpoint and implementation summary
   project/                   full latest-baseline project copy
     <editable files>         configured project-relative edit allowlist
@@ -130,6 +130,7 @@ meaningful candidate decision can be made.
   `approved/baseline.json` stores the active reference measurement.
 - `.autoresearch/rejected/<attempt>/` stores rejected workspaces and raw output
   locally; these contents are gitignored.
-- `LOGBOOK.md` stores concise reusable conclusions. Preserve full simulation or
+- `LOGBOOK.json` stores project guidance and structured experiment records,
+  including metrics for graphing. Preserve full simulation or
   benchmark logs as attempt artifacts and summarize their relevant findings in
   the logbook.
