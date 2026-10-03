@@ -51,6 +51,19 @@ build/evaluation commands, applies Sentinel-owned approval, and loops until
 interrupted (or `--once` is used). Configure Sentinel for a target project
 before running; the checked-in `config.toml` is deliberately a placeholder.
 
+## Roadmap and contributions
+
+The controller currently supports Codex as its agent provider. Contributions
+that add other CLI agents are welcome:
+
+- [ ] Add a Claude Code CLI adapter.
+- [ ] Add a Gemini CLI adapter.
+- [ ] Keep the existing Codex workflow fully usable as provider support grows.
+
+Provider adapters should leave the experiment loop, evaluation, and approval
+under Sentinel's control. If you want to work on an adapter, open an issue or
+pull request with your proposed approach.
+
 ## Benefits of Autoresearch Sentinel
 
 - **Works beyond machine learning:** use it wherever a repeatable command can
