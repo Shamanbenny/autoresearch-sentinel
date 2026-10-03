@@ -30,10 +30,33 @@
     }
   },
   "project_context": {
-    "summary": "",
-    "measurement_scope": "",
-    "metric_directions": {}
+    "summary": "CPU-only grid maze pathfinder using breadth-first search as its baseline.",
+    "measurement_scope": "Fixed 17-maze suite; routes must be legal and shortest-path optimal against an independent BFS oracle.",
+    "metric_directions": {
+      "total_nodes_explored": "minimize"
+    }
   },
-  "project_guidance": [],
-  "experiments": []
+  "project_guidance": [
+    "Read the evaluator and maze cases for context, but do not modify them.",
+    "Change only solver.py as configured in candidate.editable_files.",
+    "Preserve a shortest path for every maze; fewer explored nodes do not count if any route is invalid or non-optimal.",
+    "Treat the aggregate score as evidence for this fixed suite, not for every possible maze.",
+    "Prefer deterministic search and tie-breaking so runs are comparable."
+  ],
+  "experiments": [
+    {
+      "candidate": "V1-0",
+      "status": "baseline",
+      "hypothesis": "Baseline measurement",
+      "implementation_summary": "Breadth-first search baseline; no candidate changes applied.",
+      "metrics": {
+        "total_nodes_explored": 1930
+      },
+      "decision": {
+        "outcome": "baseline",
+        "approved": null,
+        "reason": "Measured the latest approved V1-0 seed across the fixed 17-maze evaluator suite."
+      }
+    }
+  ]
 }

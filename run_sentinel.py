@@ -311,6 +311,21 @@ def file_manifest(root: Path) -> dict[str, str]:
     return manifest
 
 
+def baseline_project_manifest(root: Path) -> dict[str, str]:
+    """Fingerprint baseline inputs, excluding runtime and environment folders."""
+    ignored_directories = {
+        ".git", ".autoresearch", "__pycache__", ".venv", "venv", "bin", "obj",
+        "node_modules", ".pytest_cache", ".tox", "target",
+    }
+    manifest: dict[str, str] = {}
+    for path in sorted(root.rglob("*")):
+        relative = path.relative_to(root)
+        if not path.is_file() or ignored_directories.intersection(relative.parts[:-1]):
+            continue
+        manifest[relative.as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return manifest
+
+
 def editable_project_changed(source: Path, candidate: Path, editable_files: list[Path]) -> bool:
     """Return whether the candidate contains any actual allowlisted source change."""
     source_manifest = file_manifest(source)
@@ -434,6 +449,7 @@ def approval_decision(value: float, baseline: float, config: dict[str, Any], fai
 def evaluator_signature(config: dict[str, Any], seed_dir: Path, editable_files: list[Path]) -> str:
     contract = {
         "seed_dir": str(seed_dir),
+        "seed_project_manifest": baseline_project_manifest(seed_dir),
         "editable_files": [item.as_posix() for item in editable_files],
         "build": config["commands"].get("build", []),
         "evaluate": config["commands"]["evaluate"],

@@ -1,0 +1,22 @@
+{
+  "schema_version": 1,
+  "metric": "total_nodes_explored",
+  "direction": "minimize",
+  "value": 1930.0,
+  "result": {
+    "schema_version": 1,
+    "status": "completed",
+    "metrics": {
+      "total_nodes_explored": 1930
+    },
+    "failures": [],
+    "artifacts": [
+      "logs/maze-runs.json"
+    ]
+  },
+  "seed_project": "/home/benny/Desktop/_gitrepo/autoresearch-sentinel/.autoresearch/project/V1-0",
+  "source_project": "/home/benny/Desktop/_gitrepo/autoresearch-sentinel/approved/V1-0/project",
+  "evaluator_signature": "538dd1db34aa8928e0edac39ae8b3cb940476e1e41d2357b44c4f074edc79d4e",
+  "latest_approved_version": "V1-0",
+  "latest_approved_project_dir": "approved/V1-0/project"
+}

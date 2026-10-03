@@ -48,8 +48,8 @@ improvement Autoresearch Sentinel sets out to provide.
 The Sentinel (the Python Controller) is implemented in `run_sentinel.py`. It
 creates isolated workspaces, invokes the Codex Python SDK, runs configured
 build/evaluation commands, applies Sentinel-owned approval, and loops until
-interrupted (or `--once` is used). Configure Sentinel for a target project
-before running; the checked-in `config.toml` is deliberately a placeholder.
+interrupted (or `--once` is used). The current branch is configured with a
+CPU-only maze-pathfinder demonstration project.
 
 ## Benefits of Autoresearch Sentinel
 
@@ -133,6 +133,29 @@ workspaces. Keeping those together in one fork prevents separate experiments
 from overwriting or mixing configuration and candidate state. To run another
 independent setup, create another fork rather than sharing the same
 `config.toml`, `approved/`, or `.autoresearch/` directories.
+
+## CPU-only demo: maze pathfinder
+
+This branch includes a complete Python project under
+`.autoresearch/project/V1-0/`. Its baseline `solver.py` uses breadth-first
+search (BFS). The evaluator checks 17 fixed mazes, verifies every route is
+legal and shortest using an independent oracle, and minimizes the total number
+of nodes explored. No GPU or third-party Python packages are needed for the
+candidate or evaluator.
+
+The agent may edit only `solver.py`; it can read `evaluate.py`, `mazes.json`, and
+the project README as context. The evaluator and cases are protected by
+`candidate.editable_files = ["solver.py"]`.
+
+From the `autoresearch-sentinel/` root, run one baseline plus one experiment:
+
+```bash
+python run_sentinel.py --once --prompt "Find one deterministic change to reduce total nodes explored while preserving shortest-path correctness on every fixed maze."
+```
+
+Sentinel first measures V1-0, then asks the agent to implement V1-1 and evaluates
+it. To let the loop continue beyond the first attempt, remove `--once`. The
+config is already set for this demo.
 
 ## Usage
 
