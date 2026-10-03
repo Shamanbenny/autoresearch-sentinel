@@ -110,13 +110,15 @@ approved project. It preserves and evaluates the workspace only when it has a
 non-empty hypothesis, a non-empty implementation summary, and at least one
 actual allowlisted source change. A hypothesis alone is only an early
 checkpoint; it does not show that implementation finished. Without all three
-signals, Sentinel skips evaluation and state updates. On the next run it
-recreates that same version from the latest approved snapshot and asks the
-agent to choose a different hypothesis from the one in the interrupted
-checkpoint. An agent failure before recording a hypothesis also leaves version
-state unchanged, so the continuous loop retries that version. Configuration
-errors and failure to establish a valid baseline stop the run because no
-meaningful candidate decision can be made.
+signals, Sentinel skips evaluation and state updates. If a hypothesis exists,
+the next run refreshes only that workspace's `project/` folder from the latest
+approved snapshot, preserves `RESULT.json`, and asks the agent to continue the
+recorded hypothesis. If no hypothesis was recorded, Sentinel recreates the
+workspace and starts a fresh attempt for that version. An agent failure before
+recording a hypothesis also leaves version state unchanged, so the continuous
+loop retries that version. Configuration errors and failure to establish a
+valid baseline stop the run because no meaningful candidate decision can be
+made.
 
 ## Durable artifacts
 

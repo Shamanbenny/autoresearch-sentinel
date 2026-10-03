@@ -30,10 +30,12 @@ Sentinel puts continuation under code control: the agent
 handles one bounded hypothesis, while code outside the model runs evaluation,
 records the result, persists progress, and schedules the next attempt. After a
 process interruption, Sentinel reuses a workspace only when `RESULT.json`
-contains a non-empty hypothesis and implementation summary and the candidate
-has an actual allowlisted source change. Otherwise it discards the incomplete
-project copy and restarts that version from the latest approved seed, asking
-for a different hypothesis; it does not resume the exact same Codex turn.
+contains a non-empty hypothesis, implementation summary, and actual allowlisted
+source change. If a hypothesis exists but implementation is incomplete,
+Sentinel refreshes only the workspace's `project/` copy from the latest
+approved snapshot and preserves `RESULT.json`, so the next turn continues the
+same hypothesis. If no hypothesis was recorded, Sentinel recreates the sandbox
+from the latest approved seed. It does not resume the exact same Codex turn.
 Agent output and experiment results remain probabilistic;
 the goal is reliable orchestration, not deterministic discovery.
 As the developer, my aim is to remove uncertainty from the parts software can
@@ -86,8 +88,8 @@ before running; the checked-in `config.toml` is deliberately a placeholder.
 - **Implementation checkpoint for recovery:** the agent writes its hypothesis
   before editing and its implementation summary after making a change. Sentinel
   evaluates a preserved candidate only when both fields are present and an
-  allowlisted project file actually changed; otherwise it restarts the same
-  version from the latest approved snapshot and asks for a different hypothesis.
+  allowlisted project file actually changed. If interrupted earlier, it refreshes
+  only `project/` and preserves the hypothesis in `RESULT.json` for continuation.
 - **Isolated evaluation:** build and evaluation commands run on a separate copy
   of the candidate, leaving the candidate snapshot clean for promotion.
 - **Structured, Sentinel-owned approval:** Sentinel validates the evaluator's
@@ -170,12 +172,13 @@ Preview the isolated workspace without invoking the agent, build, or evaluator:
 python run_sentinel.py --config config.toml --dry-run
 ```
 
-The preview remains in `.autoresearch/experimentation/` for inspection. Since it
-has no completed implementation checkpoint, the next normal run deletes and
-recreates that workspace from the latest approved project for the same
-candidate version. An interrupted attempt is recoverable only after it records
-both a non-empty implementation summary and an actual change to an allowlisted
-project file; a hypothesis by itself does not trigger evaluation.
+The preview remains in `.autoresearch/experimentation/` for inspection. If it
+has no hypothesis, the next normal run recreates that workspace from the latest
+approved project for the same candidate version. If a hypothesis was recorded
+but implementation is incomplete, the next run refreshes only `project/`,
+preserves `RESULT.json`, and continues the same hypothesis. Evaluation still
+requires a non-empty implementation summary and an actual allowlisted source
+change.
 
 Inspect `.autoresearch/experimentation/<candidate>/`, then start one complete
 baseline/candidate cycle:
@@ -308,11 +311,11 @@ Before each attempt, the agent reads its generated `PROGRAM.md`, stable
 read-only `LOGBOOK.json`, and every file in the isolated project snapshot under
 `.autoresearch/experimentation/`. Before editing, it records its hypothesis in
 `RESULT.json`; then it edits only paths listed in `candidate.editable_files`
-and records its implementation summary in `RESULT.json`. Sentinel resumes an
+and records its implementation summary in `RESULT.json`. Sentinel evaluates an
 interrupted attempt only when the summary is present and at least one allowed
-project file actually changed. A hypothesis alone is not treated as a completed
-implementation; Sentinel restarts that version from the latest approved
-snapshot and asks for a different hypothesis.
+project file actually changed. If only the hypothesis checkpoint exists,
+Sentinel refreshes the project copy but preserves that hypothesis for the next
+turn; it does not replace it with a new one.
 Sentinel runs evaluation and moves the attempt to `approved/` or `.autoresearch/rejected/` according to the configured
 rule. It appends a structured outcome and evaluator metrics to `LOGBOOK.json`.
 

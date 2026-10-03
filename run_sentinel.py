@@ -674,8 +674,8 @@ def execute_candidate(
     workspace = workspace_root / name
     result_path_in_workspace = workspace / "RESULT.json"
     recovering = False
+    resume_hypothesis = False
     recovered_result: dict[str, Any] = {}
-    interrupted_hypothesis = ""
     if workspace.exists():
         try:
             recovered_result = read_json(result_path_in_workspace)
@@ -700,29 +700,34 @@ def execute_candidate(
             print(f"Recovering {name}: implementation summary and source change found; evaluating the preserved candidate.")
         else:
             if has_hypothesis:
-                interrupted_hypothesis = recovered_result["hypothesis"].strip()
-            shutil.rmtree(workspace)
-            if interrupted_hypothesis:
+                resume_hypothesis = True
+                if project_dir.is_dir() and not project_dir.is_symlink():
+                    shutil.rmtree(project_dir)
+                elif project_dir.exists() or project_dir.is_symlink():
+                    project_dir.unlink()
+                copy_project(source_project, project_dir)
                 print(
-                    f"Discarded incomplete {name}: the hypothesis was recorded, but no completed implementation "
-                    "with an allowlisted source change was found. Restarting from the latest approved snapshot."
+                    f"Resuming {name} from its recorded hypothesis; refreshed only the project copy "
+                    "from the latest approved snapshot."
                 )
             else:
+                shutil.rmtree(workspace)
                 print(f"Discarded incomplete {name}: no durable hypothesis; retrying from latest approved snapshot.")
 
     control_before: dict[str, str] = {}
     if not recovering:
-        workspace.mkdir(parents=True)
-        project_dir = workspace / "project"
-        copy_project(source_project, project_dir)
-        (workspace / "PROGRAM.md").write_text(render_program(name, [item.as_posix() for item in editable_files], prompt), encoding="utf-8")
-        logbook_copy = workspace / "LOGBOOK.json"
-        shutil.copy2(logbook_path, logbook_copy)
-        logbook_copy.chmod(0o444)
-        result_path_in_workspace.write_text(
-            json.dumps({"hypothesis": "", "implementation_summary": ""}, indent=2) + "\n",
-            encoding="utf-8",
-        )
+        if not resume_hypothesis:
+            workspace.mkdir(parents=True)
+            project_dir = workspace / "project"
+            copy_project(source_project, project_dir)
+            (workspace / "PROGRAM.md").write_text(render_program(name, [item.as_posix() for item in editable_files], prompt), encoding="utf-8")
+            logbook_copy = workspace / "LOGBOOK.json"
+            shutil.copy2(logbook_path, logbook_copy)
+            logbook_copy.chmod(0o444)
+            result_path_in_workspace.write_text(
+                json.dumps({"hypothesis": "", "implementation_summary": ""}, indent=2) + "\n",
+                encoding="utf-8",
+            )
         control_before = {
             path: digest for path, digest in file_manifest(workspace).items()
             if not path.startswith("project/")
@@ -737,16 +742,20 @@ def execute_candidate(
     if not recovering:
         print(f"Prepared {workspace.relative_to(config_path.parent)}")
         try:
-            agent_prompt = (
-                "Follow PROGRAM.md exactly. Enumerate and read every file in the sandbox. Choose one bounded, "
-                "testable hypothesis and write it to RESULT.json before changing project files. Then make the "
-                "smallest change within candidate.editable_files, fill implementation_summary, and return control. "
-                "Do not evaluate or decide approval."
-            )
-            if interrupted_hypothesis:
-                agent_prompt += (
-                    "\n\nThis is a clean restart after an interrupted attempt. The previous hypothesis was: "
-                    f"{interrupted_hypothesis}\nChoose a different, testable hypothesis and do not repeat that change."
+            if resume_hypothesis:
+                agent_prompt = (
+                    "Continue the interrupted attempt described by PROGRAM.md. The hypothesis already recorded "
+                    "in RESULT.json is authoritative; do not replace it or choose another. The project/ folder "
+                    "has been refreshed from the latest approved snapshot. Implement the recorded hypothesis, "
+                    "update implementation_summary after changing an allowlisted file, and return control. "
+                    "Do not evaluate or decide approval."
+                )
+            else:
+                agent_prompt = (
+                    "Follow PROGRAM.md exactly. Enumerate and read every file in the sandbox. Choose one bounded, "
+                    "testable hypothesis and write it to RESULT.json before changing project files. Then make the "
+                    "smallest change within candidate.editable_files, fill implementation_summary, and return control. "
+                    "Do not evaluate or decide approval."
                 )
             agent_response = run_codex_turn(
                 workspace,
@@ -772,10 +781,9 @@ def execute_candidate(
             print(f"{name}: implementation summary and source change found; evaluating the preserved candidate.")
         else:
             if has_checkpoint:
-                interrupted_hypothesis = checkpoint["hypothesis"].strip()
                 reason = (
                     "Agent stopped before completing an implementation summary and allowlisted source change; "
-                    "the hypothesis checkpoint was preserved for a clean restart."
+                    "the hypothesis checkpoint is preserved for continuation on the next run."
                 )
             else:
                 reason = agent_error or "Agent stopped before recording a hypothesis; retrying this version from the latest approved snapshot."
@@ -786,10 +794,12 @@ def execute_candidate(
                 if len(excerpt) > 1500:
                     excerpt = excerpt[:1500] + "… [truncated]"
                 print(f"Agent final response before cleanup:\n{excerpt}", file=sys.stderr)
-            elif not agent_error:
+            elif not agent_error and not has_checkpoint:
                 print("The Codex turn completed without writing a hypothesis to RESULT.json.", file=sys.stderr)
+            elif not agent_error:
+                print("The recorded hypothesis remains, but implementation is still incomplete.", file=sys.stderr)
             if has_checkpoint:
-                print("Kept the checkpoint only to avoid repeating its hypothesis; no evaluation or state update was performed.", file=sys.stderr)
+                print("Kept RESULT.json; the next run will refresh only project/ and continue this hypothesis.", file=sys.stderr)
             else:
                 print("Discarded the incomplete workspace and left version state unchanged.", file=sys.stderr)
             return name, False, None, reason

@@ -55,14 +55,18 @@ The sandbox directory name identifies this candidate: `{{CANDIDATE}}`.
    available metadata; do not silently skip it.
 3. Use the prior results and conclusions in `LOGBOOK.json`, the supplied human
    research direction, and the project files to select exactly one bounded,
-   testable hypothesis. Avoid repeating an experiment that the logbook already
-   shows failed unless you have a specific reason to revise it.
-4. Before changing project files, write the hypothesis into `RESULT.json`,
-   leaving `implementation_summary` empty. Preserve valid JSON. This is an
-   early progress checkpoint only; Sentinel will evaluate a preserved attempt
+   testable hypothesis. On a fresh attempt, avoid repeating an experiment that
+   the logbook already shows failed unless you have a specific reason to revise
+   it. If `RESULT.json` already contains a non-empty hypothesis from an
+   interrupted attempt, continue that hypothesis instead of choosing another.
+4. On a fresh attempt, before changing project files, write the hypothesis into
+   `RESULT.json`, leaving `implementation_summary` empty. Preserve valid JSON.
+   This is an early progress checkpoint. If interrupted before implementation
+   is complete, Sentinel refreshes only `project/` from the latest approved
+   snapshot and preserves `RESULT.json`; resume the recorded hypothesis and do
+   not overwrite it with a new one. Sentinel evaluates a preserved candidate
    only after the implementation summary is filled and an allowlisted project
-   file has actually changed. If interrupted before then, Sentinel restarts
-   from the latest approved snapshot and asks for a different hypothesis.
+   file has actually changed.
 5. Implement the smallest clear change within the allowlist that tests the
    hypothesis. Do not bundle unrelated changes.
 6. Update `RESULT.json` with a concise, factual summary of the code change. Do
