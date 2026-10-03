@@ -105,13 +105,18 @@ repeatable; it cannot make a noisy test environment or probabilistic model
 output deterministic.
 
 If Sentinel finds an interrupted workspace for the next version, it checks
-`RESULT.json`. With a valid non-empty hypothesis, it preserves and evaluates the
-workspace project under the normal build, evaluation, and approval rules. With
-no hypothesis checkpoint, it deletes the workspace and retries that same
-version from the latest approved snapshot. An agent failure before recording a
-hypothesis also leaves version state unchanged, so the continuous loop retries
-that version. Configuration errors and failure to establish a valid baseline
-stop the run because no meaningful candidate decision can be made.
+`RESULT.json` and compares the candidate's allowlisted files with the latest
+approved project. It preserves and evaluates the workspace only when it has a
+non-empty hypothesis, a non-empty implementation summary, and at least one
+actual allowlisted source change. A hypothesis alone is only an early
+checkpoint; it does not show that implementation finished. Without all three
+signals, Sentinel skips evaluation and state updates. On the next run it
+recreates that same version from the latest approved snapshot and asks the
+agent to choose a different hypothesis from the one in the interrupted
+checkpoint. An agent failure before recording a hypothesis also leaves version
+state unchanged, so the continuous loop retries that version. Configuration
+errors and failure to establish a valid baseline stop the run because no
+meaningful candidate decision can be made.
 
 ## Durable artifacts
 

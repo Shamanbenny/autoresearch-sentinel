@@ -168,8 +168,11 @@ python run_sentinel.py --config config.toml --dry-run
 ```
 
 The preview remains in `.autoresearch/experimentation/` for inspection. Since it
-has no hypothesis checkpoint, the next normal run deletes and recreates that
-workspace for the same candidate version.
+has no completed implementation checkpoint, the next normal run deletes and
+recreates that workspace from the latest approved project for the same
+candidate version. An interrupted attempt is recoverable only after it records
+both a non-empty implementation summary and an actual change to an allowlisted
+project file; a hypothesis by itself does not trigger evaluation.
 
 Inspect `.autoresearch/experimentation/<candidate>/`, then start one complete
 baseline/candidate cycle:

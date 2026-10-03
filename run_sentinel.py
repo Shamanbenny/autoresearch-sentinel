@@ -310,6 +310,16 @@ def file_manifest(root: Path) -> dict[str, str]:
     return manifest
 
 
+def editable_project_changed(source: Path, candidate: Path, editable_files: list[Path]) -> bool:
+    """Return whether the candidate contains any actual allowlisted source change."""
+    source_manifest = file_manifest(source)
+    candidate_manifest = file_manifest(candidate)
+    return any(
+        source_manifest.get(path.as_posix()) != candidate_manifest.get(path.as_posix())
+        for path in editable_files
+    )
+
+
 def render_program(candidate: str, editable_files: list[str], prompt: str) -> str:
     template = PROGRAM_PATH.read_text(encoding="utf-8")
     direction = prompt.strip() or "None supplied; derive one hypothesis from the logbook and project files."
@@ -631,21 +641,40 @@ def execute_candidate(
     result_path_in_workspace = workspace / "RESULT.json"
     recovering = False
     recovered_result: dict[str, Any] = {}
+    interrupted_hypothesis = ""
     if workspace.exists():
         try:
             recovered_result = read_json(result_path_in_workspace)
         except ExperimentError:
             recovered_result = {}
-        recovering = (
+        has_hypothesis = (
             isinstance(recovered_result.get("hypothesis"), str)
             and bool(recovered_result["hypothesis"].strip())
-            and (workspace / "project").is_dir()
+        )
+        has_implementation_summary = (
+            isinstance(recovered_result.get("implementation_summary"), str)
+            and bool(recovered_result["implementation_summary"].strip())
+        )
+        project_dir = workspace / "project"
+        recovering = (
+            has_hypothesis
+            and has_implementation_summary
+            and project_dir.is_dir()
+            and editable_project_changed(source_project, project_dir, editable_files)
         )
         if recovering:
-            print(f"Recovering {name}: hypothesis recorded; evaluating the preserved candidate.")
+            print(f"Recovering {name}: implementation summary and source change found; evaluating the preserved candidate.")
         else:
+            if has_hypothesis:
+                interrupted_hypothesis = recovered_result["hypothesis"].strip()
             shutil.rmtree(workspace)
-            print(f"Discarded incomplete {name}: no durable hypothesis; retrying from latest approved snapshot.")
+            if interrupted_hypothesis:
+                print(
+                    f"Discarded incomplete {name}: the hypothesis was recorded, but no completed implementation "
+                    "with an allowlisted source change was found. Restarting from the latest approved snapshot."
+                )
+            else:
+                print(f"Discarded incomplete {name}: no durable hypothesis; retrying from latest approved snapshot.")
 
     control_before: dict[str, str] = {}
     if not recovering:
@@ -674,13 +703,21 @@ def execute_candidate(
     if not recovering:
         print(f"Prepared {workspace.relative_to(config_path.parent)}")
         try:
-            agent_response = run_codex_turn(
-                workspace,
-                config,
+            agent_prompt = (
                 "Follow PROGRAM.md exactly. Enumerate and read every file in the sandbox. Choose one bounded, "
                 "testable hypothesis and write it to RESULT.json before changing project files. Then make the "
                 "smallest change within candidate.editable_files, fill implementation_summary, and return control. "
-                "Do not evaluate or decide approval.",
+                "Do not evaluate or decide approval."
+            )
+            if interrupted_hypothesis:
+                agent_prompt += (
+                    "\n\nThis is a clean restart after an interrupted attempt. The previous hypothesis was: "
+                    f"{interrupted_hypothesis}\nChoose a different, testable hypothesis and do not repeat that change."
+                )
+            agent_response = run_codex_turn(
+                workspace,
+                config,
+                agent_prompt,
             )
         except Exception as exc:
             agent_error = f"Agent turn failed: {exc}"
@@ -689,17 +726,26 @@ def execute_candidate(
         except ExperimentError:
             checkpoint = {}
         has_checkpoint = isinstance(checkpoint.get("hypothesis"), str) and bool(checkpoint["hypothesis"].strip())
-        if has_checkpoint:
+        has_implementation_summary = (
+            isinstance(checkpoint.get("implementation_summary"), str)
+            and bool(checkpoint["implementation_summary"].strip())
+        )
+        has_source_change = (project_dir.is_dir() and editable_project_changed(source_project, project_dir, editable_files))
+        if has_checkpoint and has_implementation_summary and has_source_change:
             recovering = True
             recovered_result = checkpoint
-            if not isinstance(checkpoint.get("implementation_summary"), str) or not checkpoint["implementation_summary"].strip():
-                checkpoint["implementation_summary"] = "Agent was interrupted; Sentinel evaluated the preserved project files."
-                atomic_json(result_path_in_workspace, checkpoint)
             agent_error = ""
-            print(f"{name}: hypothesis checkpoint found; evaluating the preserved candidate after agent interruption.")
+            print(f"{name}: implementation summary and source change found; evaluating the preserved candidate.")
         else:
-            shutil.rmtree(workspace, ignore_errors=True)
-            reason = agent_error or "Agent stopped before recording a hypothesis; retrying this version from the latest approved snapshot."
+            if has_checkpoint:
+                interrupted_hypothesis = checkpoint["hypothesis"].strip()
+                reason = (
+                    "Agent stopped before completing an implementation summary and allowlisted source change; "
+                    "the hypothesis checkpoint was preserved for a clean restart."
+                )
+            else:
+                reason = agent_error or "Agent stopped before recording a hypothesis; retrying this version from the latest approved snapshot."
+                shutil.rmtree(workspace, ignore_errors=True)
             print(f"{name}: {reason}", file=sys.stderr)
             if agent_response.strip():
                 excerpt = agent_response.strip()
@@ -708,11 +754,11 @@ def execute_candidate(
                 print(f"Agent final response before cleanup:\n{excerpt}", file=sys.stderr)
             elif not agent_error:
                 print("The Codex turn completed without writing a hypothesis to RESULT.json.", file=sys.stderr)
-            print("Discarded the incomplete workspace and left version state unchanged.", file=sys.stderr)
+            if has_checkpoint:
+                print("Kept the checkpoint only to avoid repeating its hypothesis; no evaluation or state update was performed.", file=sys.stderr)
+            else:
+                print("Discarded the incomplete workspace and left version state unchanged.", file=sys.stderr)
             return name, False, None, reason
-    elif not isinstance(recovered_result.get("implementation_summary"), str) or not recovered_result["implementation_summary"].strip():
-        recovered_result["implementation_summary"] = "Implementation was interrupted; Sentinel evaluated the preserved project files."
-        atomic_json(result_path_in_workspace, recovered_result)
 
     baseline_files = file_manifest(source_project)
     candidate_files = file_manifest(project_dir)
@@ -743,8 +789,7 @@ def execute_candidate(
         if not isinstance(return_note.get("hypothesis"), str) or not return_note["hypothesis"].strip():
             raise ExperimentError("RESULT.json must contain a non-empty hypothesis.")
         if not isinstance(return_note.get("implementation_summary"), str) or not return_note["implementation_summary"].strip():
-            return_note["implementation_summary"] = "Implementation did not complete before recovery."
-            atomic_json(result_path_in_workspace, return_note)
+            raise ExperimentError("RESULT.json must contain a non-empty implementation_summary.")
     except ExperimentError as exc:
         if not reason:
             reason = f"Agent did not provide a valid RESULT.json: {exc}"

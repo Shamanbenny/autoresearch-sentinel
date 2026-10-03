@@ -56,9 +56,11 @@ The sandbox directory name identifies this candidate: `{{CANDIDATE}}`.
    testable hypothesis. Avoid repeating an experiment that the logbook already
    shows failed unless you have a specific reason to revise it.
 4. Before changing project files, write the hypothesis into `RESULT.json`,
-   leaving `implementation_summary` empty. Preserve valid JSON. This is the
-   recovery checkpoint; Sentinel can evaluate the preserved attempt if the
-   agent process is interrupted afterward.
+   leaving `implementation_summary` empty. Preserve valid JSON. This is an
+   early progress checkpoint only; Sentinel will evaluate a preserved attempt
+   only after the implementation summary is filled and an allowlisted project
+   file has actually changed. If interrupted before then, Sentinel restarts
+   from the latest approved snapshot and asks for a different hypothesis.
 5. Implement the smallest clear change within the allowlist that tests the
    hypothesis. Do not bundle unrelated changes.
 6. Update `RESULT.json` with a concise, factual summary of the code change. Do
