@@ -145,6 +145,11 @@ def load_config(path: Path) -> dict[str, Any]:
     return config
 
 
+def log_section(title: str) -> None:
+    """Print a stable, highly visible boundary in the controller output."""
+    print(f"=====\n{title}\n=====", flush=True)
+
+
 def safe_relative_path(value: str, label: str) -> Path:
     path = Path(value)
     if path.is_absolute() or ".." in path.parts:
@@ -413,17 +418,54 @@ def run_codex_turn(
     manager = Codex(CodexConfig(codex_bin=codex_bin)) if codex_bin else Codex()
     sandbox = Sandbox.workspace_write
     with manager as codex:
+        log_section("Sandbox Agent started")
         thread = codex.thread_start(
             cwd=str(workspace),
             model=config["agent"]["model"],
             sandbox=sandbox,
         )
         turn = thread.turn(prompt, cwd=str(workspace), sandbox=sandbox)
-        result_box: dict[str, Any] = {}
+        result_box: dict[str, Any] = {
+            "error": None,
+            "completed_status": None,
+            "completed_error": None,
+            "completed_usage": None,
+            "completed_texts": [],
+            "printed_response_prefix": False,
+        }
 
         def consume_turn() -> None:
             try:
-                result_box["result"] = turn.run()
+                for event in turn.stream():
+                    method = getattr(event, "method", "unknown")
+                    if method == "turn/started":
+                        print("Codex turn started.", flush=True)
+                    elif method == "item/agentMessage/delta":
+                        delta = getattr(getattr(event, "payload", None), "delta", "")
+                        if delta:
+                            if not result_box["printed_response_prefix"]:
+                                print("\n[Sandbox Agent response] ", end="", flush=True)
+                                result_box["printed_response_prefix"] = True
+                            print(delta, end="", flush=True)
+                    elif method == "item/completed":
+                        item = getattr(getattr(event, "payload", None), "item", None)
+                        root = getattr(item, "root", item)
+                        if getattr(root, "type", None) == "agentMessage":
+                            text = getattr(root, "text", "")
+                            if text:
+                                result_box["completed_texts"].append(text)
+                        else:
+                            item_type = getattr(root, "type", "unknown")
+                            print(f"\nCodex item completed: {item_type}", flush=True)
+                    elif method == "turn/completed":
+                        completed_turn = getattr(getattr(event, "payload", None), "turn", None)
+                        result_box["completed_status"] = getattr(completed_turn, "status", None)
+                        result_box["completed_error"] = getattr(completed_turn, "error", None)
+                        result_box["completed_usage"] = getattr(completed_turn, "usage", None)
+                    else:
+                        # Keep less common SDK notifications visible without
+                        # dumping potentially large payloads into the console.
+                        print(f"Codex event: {method}", flush=True)
             except BaseException as exc:
                 result_box["error"] = exc
 
@@ -437,12 +479,22 @@ def run_codex_turn(
                 pass
             worker.join(timeout=5)
             raise ExperimentError("Codex turn timed out and the attempt workspace was preserved for retry.")
-        if "error" in result_box:
+        if result_box["printed_response_prefix"]:
+            print(flush=True)
+        if result_box["error"] is not None:
             raise ExperimentError(f"Codex turn failed: {result_box['error']}")
-        result = result_box["result"]
-        if getattr(result.status, "value", result.status) != "completed":
-            raise ExperimentError(f"Codex turn ended with status {result.status}: {result.error}")
-        return result.final_response or ""
+        status = getattr(result_box["completed_status"], "value", result_box["completed_status"])
+        if status != "completed":
+            raise ExperimentError(
+                f"Codex turn ended with status {status}: {result_box['completed_error']}"
+            )
+        if result_box["completed_usage"] is not None:
+            usage = result_box["completed_usage"]
+            if hasattr(usage, "model_dump"):
+                usage = usage.model_dump(exclude_none=True)
+            print(f"Codex usage: {json.dumps(usage, sort_keys=True, default=str)}", flush=True)
+        log_section("Sandbox Agent finished")
+        return (result_box["completed_texts"][-1] if result_box["completed_texts"] else "").strip()
 
 
 def establish_baseline(
@@ -477,14 +529,18 @@ def establish_baseline(
         timeout = int(config["commands"].get("timeout_seconds", 3600))
         build_log = baseline_dir / "baseline-build.log"
         evaluation_log = baseline_dir / "baseline-evaluation.log"
+        log_section("Baseline build started")
         if not run_command(config["commands"].get("build", []), project_dir, candidate_file, build_log, timeout):
             raise ExperimentError(f"Baseline build failed; inspect {build_log}.")
+        log_section("Baseline evaluation started")
         result_path = project_dir / safe_relative_path(config["evaluation"]["result_file"], "evaluation.result_file")
         result_path.parent.mkdir(parents=True, exist_ok=True)
         result_path.unlink(missing_ok=True)
         if not run_command(config["commands"]["evaluate"], project_dir, candidate_file, evaluation_log, timeout):
             raise ExperimentError(f"Baseline evaluation command failed; inspect {evaluation_log}.")
         result, value = validate_evaluation(result_path, config, project_dir)
+        log_section("Baseline evaluation finished")
+        print(json.dumps(result, indent=2, sort_keys=True), flush=True)
         if result["failures"]:
             raise ExperimentError("Baseline evaluator reported failures; refusing to establish an invalid baseline.")
         baseline = {
@@ -699,20 +755,25 @@ def execute_candidate(
     if not reason:
         shutil.rmtree(evaluation_project, ignore_errors=True)
         copy_project(project_dir, evaluation_project)
+        log_section(f"{name}: build started")
         build_ok = run_command(config["commands"].get("build", []), evaluation_project, evaluation_candidate_file, workspace / "build.log", timeout)
         if not build_ok:
             reason = "Build command failed or timed out."
+        else:
+            log_section(f"{name}: build finished")
 
     if not reason:
         result_path = evaluation_project / safe_relative_path(config["evaluation"]["result_file"], "evaluation.result_file")
         result_path.parent.mkdir(parents=True, exist_ok=True)
         result_path.unlink(missing_ok=True)
+        log_section(f"{name}: evaluation started")
         eval_ok = run_command(config["commands"]["evaluate"], evaluation_project, evaluation_candidate_file, workspace / "evaluation.log", timeout)
         if not eval_ok:
             reason = "Evaluation command failed or timed out."
         else:
             try:
                 result, value = validate_evaluation(result_path, config, evaluation_project)
+                log_section(f"{name}: evaluation finished")
                 approved, reason = approval_decision(
                     value,
                     float((state or {}).get("latest_approved", {}).get("metric", baseline["value"])),
@@ -721,6 +782,18 @@ def execute_candidate(
                 )
             except ExperimentError as exc:
                 reason = f"Invalid evaluator result: {exc}"
+
+    log_section(f"{name}: evaluation result and approval decision")
+    if result is None:
+        unavailable = {
+            "status": "unavailable",
+            "reason": reason or "No evaluation result was produced.",
+        }
+        print(json.dumps(unavailable, indent=2), flush=True)
+    else:
+        print(json.dumps(result, indent=2, sort_keys=True), flush=True)
+    print(f"Approval decision: {'APPROVED' if approved else 'REJECTED'}", flush=True)
+    print(f"Approval reason: {reason or 'No approval decision was recorded.'}", flush=True)
 
     if approved:
         version = version_label(major, minor)
@@ -768,7 +841,8 @@ def execute_candidate(
     append_logbook(logbook_path, name, "approved" if approved else "rejected", config["metric"]["name"], value, reason, return_note)
     if approved:
         shutil.rmtree(workspace)
-    print(f"{name}: {'APPROVED' if approved else 'REJECTED'} — {reason}")
+    log_section(f"Experiment {name} complete")
+    print(f"{name}: {'APPROVED' if approved else 'REJECTED'} — {reason}", flush=True)
     return name, approved, value, reason
 
 
