@@ -13,6 +13,7 @@ from typing import Any
 
 DEFAULT_LOGBOOK = Path(__file__).resolve().with_name("LOGBOOK.json")
 OUTPUT_PATH = Path(__file__).resolve().with_name("sentinel-research-plot.svg")
+MAX_POINTS_PER_PLOT = 50
 COLORS = {
     "baseline": "#64748b",
     "approved": "#15803d",
@@ -37,10 +38,10 @@ def numeric_points(document: dict[str, Any], metric: str) -> list[dict[str, Any]
     return points
 
 
-def svg_chart(metric: str, points: list[dict[str, Any]], direction: str) -> str:
+def svg_chart(metric: str, points: list[dict[str, Any]], direction: str, first_experiment: int) -> str:
     left, right, top, bottom = 90, 35, 75, 150
-    width = max(760, left + right + 125 * max(len(points) - 1, 1))
-    height = 520
+    width = 1200
+    height = 560
     plot_top, plot_bottom = top, height - bottom
     plot_height = plot_bottom - plot_top
     values = [point["value"] for point in points]
@@ -72,24 +73,35 @@ def svg_chart(metric: str, points: list[dict[str, Any]], direction: str) -> str:
         parts.append(f'<line x1="{left}" y1="{y:.1f}" x2="{width - right}" y2="{y:.1f}" stroke="#e2e8f0"/>')
         parts.append(f'<text x="{left - 12}" y="{y + 4:.1f}" text-anchor="end" font-family="sans-serif" font-size="12" fill="#475569">{value:.5g}</text>')
 
-    baseline = next((point["value"] for point in points if point["status"] == "baseline"), None)
-    if baseline is not None:
-        y = y_position(baseline)
-        parts.append(f'<line x1="{left}" y1="{y:.1f}" x2="{width - right}" y2="{y:.1f}" stroke="#64748b" stroke-dasharray="6 5"/>')
-        parts.append(f'<text x="{width - right - 4}" y="{y - 7:.1f}" text-anchor="end" font-family="sans-serif" font-size="11" fill="#64748b">baseline {baseline:.5g}</text>')
-
     coordinates = [(x_position(i), y_position(point["value"])) for i, point in enumerate(points)]
-    if len(coordinates) > 1:
-        polyline = " ".join(f"{x:.1f},{y:.1f}" for x, y in coordinates)
-        parts.append(f'<polyline points="{polyline}" fill="none" stroke="#94a3b8" stroke-width="2"/>')
+    approved_coordinates = [coordinate for point, coordinate in zip(points, coordinates) if point["status"] == "approved"]
+    if len(approved_coordinates) > 1:
+        polyline = " ".join(f"{x:.1f},{y:.1f}" for x, y in approved_coordinates)
+        parts.append(f'<polyline points="{polyline}" fill="none" stroke="#15803d" stroke-width="2"/>')
 
-    for point, (x, y) in zip(points, coordinates):
+    for index, (point, (x, y)) in enumerate(zip(points, coordinates)):
         status = point["status"]
         color = COLORS.get(status, COLORS["other"])
         parts.append(f'<circle cx="{x:.1f}" cy="{y:.1f}" r="7" fill="{color}" stroke="#ffffff" stroke-width="2"/>')
-        parts.append(f'<text x="{x:.1f}" y="{y - 12:.1f}" text-anchor="middle" font-family="sans-serif" font-size="12" fill="#0f172a">{point["value"]:.5g}</text>')
-        label = html.escape(point["candidate"])
-        parts.append(f'<text transform="translate({x:.1f},{plot_bottom + 18}) rotate(45)" text-anchor="start" font-family="sans-serif" font-size="11" fill="#334155">{label}</text>')
+        if direction == "minimize":
+            metric_x, metric_y, metric_anchor = x + 6, y - 12, "middle"
+            label_x, label_y, label_anchor, label_angle = x + 6, y - 25, "start", -45
+        elif direction == "maximize":
+            metric_x, metric_y, metric_anchor = x + 6, y + 20, "start"
+            label_x, label_y, label_anchor, label_angle = x + 6, y + 35, "start", 45
+        else:
+            metric_x, metric_y, metric_anchor = x, y - 12, "middle"
+            label_x, label_y, label_anchor, label_angle = x, y - 25, "start", -45
+        if status != "rejected":
+            parts.append(f'<text x="{metric_x:.1f}" y="{metric_y:.1f}" text-anchor="{metric_anchor}" font-family="sans-serif" font-size="12" fill="#0f172a">{point["value"]:.5g}</text>')
+        experiment_number = first_experiment + index
+        parts.append(f'<text x="{x:.1f}" y="{plot_bottom + 22}" text-anchor="middle" font-family="sans-serif" font-size="11" fill="#334155">{experiment_number}</text>')
+        if status == "approved":
+            version = point["candidate"].split("_", 1)[0]
+            label = html.escape(version)
+            parts.append(f'<text transform="translate({label_x:.1f},{label_y:.1f}) rotate({label_angle})" text-anchor="{label_anchor}" font-family="sans-serif" font-size="11" fill="#15803d">{label}</text>')
+
+    parts.append(f'<text x="{(left + width - right) / 2:.1f}" y="{plot_bottom + 78}" text-anchor="middle" font-family="sans-serif" font-size="13" fill="#334155">Experiment #</text>')
 
     legend_y = height - 24
     legend_x = left
@@ -115,6 +127,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Plot metric trends from the structured experiment logbook.")
     parser.add_argument("--logbook", type=Path, default=DEFAULT_LOGBOOK, help="Path to LOGBOOK.json.")
     parser.add_argument("--metric", help="Metric key to graph; defaults to the only available metric.")
+    parser.add_argument("--output", type=Path, default=OUTPUT_PATH, help="Base SVG path; additional pages use -2, -3, and so on.")
     args = parser.parse_args()
 
     try:
@@ -142,8 +155,14 @@ def main() -> int:
     directions = project_context.get("metric_directions", {}) if isinstance(project_context, dict) else {}
     points = numeric_points(document, metric)
     direction = directions.get(metric, "unspecified") if isinstance(directions, dict) else "unspecified"
-    OUTPUT_PATH.write_text(svg_chart(metric, points, direction), encoding="utf-8")
-    print(f"Wrote {OUTPUT_PATH} ({len(points)} attempts, including rejected attempts).")
+    output_paths = []
+    for page_start in range(0, len(points), MAX_POINTS_PER_PLOT):
+        page_points = points[page_start:page_start + MAX_POINTS_PER_PLOT]
+        page_number = page_start // MAX_POINTS_PER_PLOT + 1
+        output_path = args.output if page_number == 1 else args.output.with_name(f"{args.output.stem}-{page_number}{args.output.suffix}")
+        output_path.write_text(svg_chart(metric, page_points, direction, page_start + 1), encoding="utf-8")
+        output_paths.append(output_path)
+    print(f"Wrote {len(output_paths)} plot(s) for {len(points)} attempts: {', '.join(map(str, output_paths))}.")
     return 0
 
 

@@ -209,10 +209,20 @@ python plot_logbook.py
 
 After Sentinel has recorded at least one numeric metric, the script reads
 `LOGBOOK.json`, includes every record with a numeric value,
-colors approved, rejected, and baseline points separately, and always writes
-`sentinel-research-plot.svg` at the repository root. Use
-`--metric NAME` when the logbook contains multiple metrics or `--logbook PATH`
-to read another JSON logbook. It uses only the Python standard library.
+colors approved, rejected, baseline, and other points separately, and connects
+approved points only. Rejected points do not have metric-value labels. The
+x-axis numbers each plotted record, and approved points show only the version
+part of their candidate name (for example, `V1-9`). Label placement follows the
+metric direction: for lower-is-better metrics, values and version labels appear
+above and slightly right of their points; for higher-is-better metrics, values
+appear below-right and version labels angle down-right at 45 degrees. Charts
+contain up to 50 records each, with later pages named
+`sentinel-research-plot-2.svg`, `sentinel-research-plot-3.svg`, and so on.
+Numbering continues across pages. By default, the first chart is
+`sentinel-research-plot.svg` at the repository root. Use `--metric NAME` when
+the logbook contains multiple metrics, `--logbook PATH` to read another JSON
+logbook, or `--output PATH` to choose the base SVG path. It uses only the Python
+standard library.
 
 ### Command-line parameters
 
