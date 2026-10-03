@@ -153,6 +153,13 @@ Run Sentinel from the activated environment. This avoids installing packages
 into an OS-managed Python, which may reject system-wide `pip` installs under
 PEP 668.
 
+Before running Sentinel with a command that starts an agent turn, [install the
+Codex CLI and sign in using OpenAI's official guide](https://learn.chatgpt.com/docs/codex/cli).
+The Python SDK uses that local Codex runtime and its existing authentication, so
+sign in as the same operating system user and in the environment where Sentinel
+will run. Confirm the CLI is authenticated with `codex login status`. A
+`--dry-run` does not start Codex and does not require this sign-in.
+
 Create the initial project folder:
 
 ```bash
@@ -223,6 +230,17 @@ Numbering continues across pages. By default, the first chart is
 the logbook contains multiple metrics, `--logbook PATH` to read another JSON
 logbook, or `--output PATH` to choose the base SVG path. It uses only the Python
 standard library.
+
+#### Example: maze pathfinder
+
+The [`demo/maze-pathfinder`](https://github.com/Shamanbenny/autoresearch-sentinel/tree/demo/maze-pathfinder)
+example applies the same evaluate-and-keep-or-reject loop to a maze-pathfinding
+task. Its experiment plot shows the recorded metric history, and the video
+gives a short look at the demo in action.
+
+[![Maze pathfinder experiment plot](https://github.com/Shamanbenny/autoresearch-sentinel/blob/demo/maze-pathfinder/sentinel-research-plot.svg)](https://github.com/Shamanbenny/autoresearch-sentinel/blob/demo/maze-pathfinder/sentinel-research-plot.svg)
+
+[Watch the maze pathfinder demo video](https://github.com/Shamanbenny/autoresearch-sentinel/blob/demo/maze-pathfinder/Demo_Video.mp4).
 
 ### Command-line parameters
 
